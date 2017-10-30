@@ -53,7 +53,7 @@ package Server; {
             get_requested_data_opt82 => '',
             get_routing => '',
             lease_offered => '',
-            lease_nak => '';
+            lease_nak => '',
             lease_decline => '',
             lease_release => '',
             lease_success => '',
