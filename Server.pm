@@ -617,8 +617,8 @@ package Server; {
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $dhcpreqparams = $_[1]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
         $sth = $_[0]->prepare($self->{get_requested_data});
-        $sth->bind(1, $mac);
-        $sth->bind(2, $ipaddr);
+        $sth->bind_param(1, $mac);
+        $sth->bind_param(2, $ipaddr);
 
         if ($self->{DEBUG} > 1) {
             $self->logger("Got a packet src = $ipaddr:$port");
@@ -643,7 +643,7 @@ package Server; {
 
             if ($dhcp_opt82_chasis_id ne '') {
                 $sth = $_[0]->prepare($self->{get_requested_data_opt82});
-                $sth->bind(1, $dhcp_opt82_vlan_id);
+                $sth->bind_param(1, $dhcp_opt82_vlan_id);
                 $self->logger("SQL: $self->{get_requested_data_opt82}") if ($self->{DEBUG} > 1);
                 $sth->execute();
 
