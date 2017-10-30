@@ -616,14 +616,14 @@ package Server; {
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $dhcpreqparams = $_[1]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
-        $sth = $_[0]->prepare($self->{get_requested_data}, $mac, $ipaddr);
+        $sth = $_[0]->prepare($self->{get_requested_data});
 
         if ($self->{DEBUG} > 1) {
             $self->logger("Got a packet src = $ipaddr:$port");
             $self->logger("SQL: $self->{get_requested_data}", $mac, $ipaddr);
         }
 
-        $sth->execute();
+        $sth->execute($mac, $ipaddr);
 
         if ($sth->rows()) {
             $result = $sth->fetchrow_hashref();
@@ -640,9 +640,9 @@ package Server; {
             # try work as traditional DHCP: find scope by opt82 info, then give some free addr
 
             if ($dhcp_opt82_chasis_id ne '') {
-                $sth = $_[0]->prepare($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id);
+                $sth = $_[0]->prepare($self->{get_requested_data_opt82});
                 $self->logger("SQL: $self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id) if ($self->{DEBUG} > 1);
-                $sth->execute();
+                $sth->execute($dhcp_opt82_vlan_id);
 
                 if ($sth->rows()) {
                     $result = $sth->fetchrow_hashref();
