@@ -207,10 +207,8 @@ package Server; {
 
         while ($self->{RUNNING} == 1) {
             $buf = undef;
-#            $self->logger("RUNNING: $self->{RUNNING}") if ($self->{DEBUG} > 1);
 
             eval {
-#                $self->logger("RUNNING: $self->{RUNNING}") if ($self->{DEBUG} > 1);
                 # catch fatal errors
                 # receive packet
                 $fromaddr = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger("Thread ($tid) recv err: $!");
