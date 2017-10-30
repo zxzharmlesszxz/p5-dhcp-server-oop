@@ -770,10 +770,12 @@ package Server; {
         #my $dbh = $_[0];
         #my $dhcpreq = $_[1];
         #my $dhcpresp = $_[2];
-        my ($mac, $sth);
+        my ($mac, $sth, $yaddr);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
+        $yaddr = $_[2]->yiaddr();
         $sth = $_[0]->prepare($self->{lease_offered});
+
         $self->logger("SQL: $self->{lease_offered}") if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
