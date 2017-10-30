@@ -24,11 +24,6 @@ my $log_detailed = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`
 # this keeps the program alive or something after exec'ing perl scripts
 END{}
 BEGIN{}
-{
-    no warnings; *CORE::GLOBAL::exit = sub {die "fakeexit\nrc=" . shift() . "\n";};
-};
-eval q{exit};
-if ($@) {exit unless $@ =~ /^fakeexit/;};
 
 sub start {
     if ($#ARGV == - 1) {usage();}

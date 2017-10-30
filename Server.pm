@@ -124,15 +124,16 @@ package Server; {
         my($self) = shift;
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
-        #setuid(65534)		or die "Can't set uid: $!\n"; # nobody
+        #POSIX::setuid(65534) or die "Can't set uid: $!\n"; # nobody
+        POSIX::setsid or die "Can't start a new session: $!\n";
+        defined(my $tm = POSIX::fork()) or die "Can't fork: $!\n";
+        exit if $tm;
+        POSIX::umask 0;
+        POSIX::chdir("/");
 
         open(STDIN, "+>/dev/null") or die "Can't open STDIN: $!\n";
         open(STDOUT, "+>&STDIN") or die "Can't open STDOUT: $!\n";
         open(STDERR, "+>&STDIN") or die "Can't open STDERR: $!\n";
-        defined(my $tm = fork) or die "Can't fork: $!\n";
-        exit if $tm;
-        setsid or die "Can't start a new session: $!\n";
-        umask 0;
 
         $self->logger("Daemon mode");
     }
