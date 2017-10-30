@@ -732,7 +732,7 @@ package Server; {
 
         $sth = $_[0]->prepare($self->{get_routing});
         $self->logger("SQL: $self->{get_routing}") if ($self->{DEBUG} > 1);
-        $sth->execute();
+        $sth->execute($_[2]);
         if ($sth->rows()) {
             my $ref;
             my $row;
