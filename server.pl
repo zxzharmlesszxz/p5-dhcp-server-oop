@@ -21,14 +21,6 @@ my $log_detailed = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`
 
 &start();
 
-# this keeps the program alive or something after exec'ing perl scripts
-END{
-    $server->logger("DHCP Server stopped!");
-}
-BEGIN{
-    $server->logger("DHCP Server started!");
-}
-
 sub start {
     if ($#ARGV == - 1) {usage();}
     
@@ -97,3 +89,11 @@ sub usage {
 }
 
 $server->start();
+
+# this keeps the program alive or something after exec'ing perl scripts
+END{
+    $server->logger("DHCP Server stopped!");
+}
+BEGIN{
+    $server->logger("DHCP Server started!");
+}
