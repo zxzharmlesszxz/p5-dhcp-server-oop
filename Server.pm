@@ -407,21 +407,21 @@ package Server; {
         for (my $i = 0; defined($RelayAgent[$i]); $i += 2) {
             if ($RelayAgent[$i] == 1) {
                     # Circuit ID
-                    $self->logger("RelayAgent Circuit ID: " . $RelayAgent[($i + 1)]);
+                    $self->logger("RelayAgent Circuit ID: " . $RelayAgent[($i + 1)]) if ($self->{DEBUG} > 1);
                     next if (length($RelayAgent[($i + 1)]) < 4);
                     # first bytes must be: 00 04
                     #$_[1] = unpack('n', substr($RelayAgent[($i + 1)], -4, 2)); # may be 's'
                     $RelayAgent[($i + 1)] =~ /(\d+)(?=\ )/;
                     $_[1] = $1;
-                    $self->logger("RelayAgent VLan: " . $_[1]);
+                    $self->logger("RelayAgent VLan: " . $_[1]) if ($self->{DEBUG} > 1);
                     #$_[2] = unpack('C', substr($RelayAgent[($i + 1)], -2, 1));
                     $RelayAgent[($i + 1)] =~ /(\d+)(?=\/\d+:)/;
                     $_[2] = $1;
-                    $self->logger("RelayAgent Unit: " . $_[2]);
+                    $self->logger("RelayAgent Unit: " . $_[2]) if ($self->{DEBUG} > 1);
                     #$_[3] = unpack('C', substr($RelayAgent[($i + 1)], -1, 1));
                     $RelayAgent[($i + 1)] =~ /(\d+)(?=:)/;
                     $_[3] = $1;
-                    $self->logger("RelayAgent Port: " . $_[3]);
+                    $self->logger("RelayAgent Port: " . $_[3]) if ($self->{DEBUG} > 1);
                 }
             elsif ($RelayAgent[$i] == 2) {
                     # Remote ID
@@ -429,13 +429,13 @@ package Server; {
                     # first bytes must be: 00 06 or 01 06 or 02 xx
                     # first digit - format/data type, second - len
                     $_[4] = $self->FormatMAC(unpack("H*", substr($RelayAgent[($i + 1)], - 6, 6)));
-                    $self->logger("RelayAgent 4: " . $_[4]);
+                    $self->logger("RelayAgent 4: " . $_[4]) if ($self->{DEBUG} > 1);
                     # 02 xx - contain vlan num, undone
                 }
             elsif ($RelayAgent[$i] == 6) {
                     # Subscriber ID
                     $_[5] = $RelayAgent[($i + 1)];
-                    $self->logger("RelayAgent 5: " . $_[5]);
+                    $self->logger("RelayAgent 5: " . $_[5]) if ($self->{DEBUG} > 1);
                 }
             else {}
         }
