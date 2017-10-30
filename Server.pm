@@ -48,7 +48,16 @@ package Server; {
             PIDFILE => '/var/run/dhcpd.pid',
             DEBUG => 0,
             DAEMON => undef,
-            RUNNING => 0
+            RUNNING => 0,
+            get_requested_data => '',
+            get_requested_data_opt82 => '',
+            get_routing => '',
+            lease_offered => '',
+            lease_nak => '';
+            lease_decline => '',
+            lease_release => '',
+            lease_success => '',
+            log_detailed => ''
         };
 
         bless $self, $class;
@@ -607,11 +616,11 @@ package Server; {
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $dhcpreqparams = $_[1]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
-        $sth = $_[0]->prepare("SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '$mac' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '$ipaddr' LIMIT 1;");
+        $sth = $_[0]->prepare($self->{get_requested_data});
 
         if ($self->{DEBUG} > 1) {
             $self->logger("Got a packet src = $ipaddr:$port");
-            $self->logger("SQL: SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '$mac' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '$ipaddr' LIMIT 1;");
+            $self->logger("SQL: $self->{get_requested_data}");
         }
 
         $sth->execute();
@@ -631,8 +640,8 @@ package Server; {
             # try work as traditional DHCP: find scope by opt82 info, then give some free addr
 
             if ($dhcp_opt82_chasis_id ne '') {
-                $sth = $_[0]->prepare("SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '$dhcp_opt82_vlan_id' AND `subnets`.`type` = 'guest' AND `ips`.`lease_time` = '' LIMIT 1;");
-                $self->logger("SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '$dhcp_opt82_vlan_id' AND `subnets`.`type` = 'guest' AND `ips`.`lease_time` = '' LIMIT 1;") if ($self->{DEBUG} > 1);
+                $sth = $_[0]->prepare($self->{get_requested_data_opt82});
+                $self->logger("SQL: $self->{get_requested_data_opt82}") if ($self->{DEBUG} > 1);
                 $sth->execute();
 
                 if ($sth->rows()) {
@@ -721,8 +730,8 @@ package Server; {
             return ();
         }
 
-        $sth = $_[0]->prepare("SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '$_[2]' LIMIT 30;");
-        $self->logger("SQL: SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '$_[2]' LIMIT 30;") if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare($self->{get_routing});
+        $self->logger("SQL: $self->{get_routing}") if ($self->{DEBUG} > 1);
         $sth->execute();
         if ($sth->rows()) {
             my $ref;
@@ -764,8 +773,8 @@ package Server; {
         my ($mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $sth = $_[0]->prepare("UPDATE `ips` SET `mac` = '$mac', `lease_time` = UNIX_TIMESTAMP()+3600 WHERE `ip` = '".$_[2]->yiaddr()."';");
-        $self->logger("SQL: UPDATE `ips` SET `mac` = '$mac', `lease_time` = UNIX_TIMESTAMP()+3600 WHERE `ip` = '".$_[2]->yiaddr()."';") if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare($self->{lease_offered});
+        $self->logger("SQL: $self->{lease_offered}") if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
@@ -780,8 +789,8 @@ package Server; {
         my ($mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $sth = $_[0]->prepare("");
-        $self->logger("SQL: lease nak") if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare($self->{lease_nak});
+        $self->logger("SQL: $self->{lease_nak}") if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
@@ -806,8 +815,8 @@ package Server; {
         $hostname = defined($_[1]->getOptionRaw(DHO_HOST_NAME())) ? $_[1]->getOptionValue(DHO_HOST_NAME()) : '';
         $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
         $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
-        $sth = $_[0]->prepare("INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(),'$mac','$client_ip','$gateway_ip','$client_ident','$requested_ip','$hostname', '$dhcp_vendor_class','$dhcp_user_class','$dhcp_opt82_chasis_id','$dhcp_opt82_unit_id', '$dhcp_opt82_port_id','$dhcp_opt82_vlan_id','$dhcp_opt82_subscriber_id');");
-        $self->logger("SQL: INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(),'$mac','$client_ip','$gateway_ip','$client_ident','$requested_ip','$hostname', '$dhcp_vendor_class','$dhcp_user_class','$dhcp_opt82_chasis_id','$dhcp_opt82_unit_id', '$dhcp_opt82_port_id','$dhcp_opt82_vlan_id','$dhcp_opt82_subscriber_id');") if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare($self->{lease_decline});
+        $self->logger("SQL: $self->{lease_decline}") if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
@@ -822,8 +831,8 @@ package Server; {
         my ($mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $sth = $_[0]->prepare("UPDATE `ips` SET `lease_time` = '', `mac` = NULL WHERE `mac` ='$mac';");
-        $self->logger("SQL: UPDATE `ips` SET `lease_time` = '', `mac` = NULL WHERE `mac` ='$mac';") if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare($self->{lease_release});
+        $self->logger("SQL: $self->{lease_release}") if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
@@ -842,8 +851,8 @@ package Server; {
         $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
         $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
-        $sth = $_[0]->prepare("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='$mac' WHERE `ip` = (SELECT `ip` FROM `clients` WHERE `mac` = '$mac' AND`subnet_id` = (SELECT `subnet_id` FROM `subnets` WHERE `vlan_id` = $dhcp_opt82_vlan_id AND `type` != 'guest'));");
-        $self->logger("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='$mac' WHERE `ip` = (SELECT `ip` FROM `clients` WHERE `mac` = '$mac' AND `subnet_id` = (SELECT `subnet_id` FROM `subnets` WHERE `vlan_id` = $dhcp_opt82_vlan_id AND `type` != 'guest'));") if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare($self->{lease_success});
+        $self->logger("SQL: $self->{lease_success}") if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
     }
@@ -867,30 +876,7 @@ package Server; {
         $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
         $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
 
-        $sth = $_[0]->prepare(
-            "INSERT INTO `dhcp_log`
-                (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`,
-                `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`,
-                `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`)
-            VALUES
-                (NOW(),'$mac','$client_ip','$gateway_ip','$client_ident','$requested_ip','$hostname',
-                '$dhcp_vendor_class','$dhcp_user_class','$dhcp_opt82_chasis_id','$dhcp_opt82_unit_id',
-                '$dhcp_opt82_port_id','$dhcp_opt82_vlan_id','$dhcp_opt82_subscriber_id')
-            ON DUPLICATE KEY UPDATE
-                `client_ip`                 = '$client_ip',
-                `client_ident`              = '$client_ident',
-                `requested_ip`              = '$requested_ip',
-                `hostname`                  = '$hostname',
-                `dhcp_vendor_class`         = '$dhcp_vendor_class',
-                `dhcp_user_class`           = '$dhcp_user_class',
-                `gateway_ip`                = if('$gateway_ip' = '0.0.0.0', `gateway_ip`, '$gateway_ip'),
-                `dhcp_opt82_chasis_id`      = if('$dhcp_opt82_chasis_id' = '', `dhcp_opt82_chasis_id`, '$dhcp_opt82_chasis_id'),
-                `dhcp_opt82_unit_id`        = if('$dhcp_opt82_unit_id' = '', `dhcp_opt82_unit_id`, '$dhcp_opt82_unit_id'),
-                `dhcp_opt82_port_id`        = if('$dhcp_opt82_port_id' = '', `dhcp_opt82_port_id`, '$dhcp_opt82_port_id'),
-                `dhcp_opt82_vlan_id`        = if('$dhcp_opt82_vlan_id' = '', `dhcp_opt82_vlan_id`, '$dhcp_opt82_vlan_id'),
-                `dhcp_opt82_subscriber_id`  = if('$dhcp_opt82_subscriber_id' = '', `dhcp_opt82_subscriber_id`, '$dhcp_opt82_subscriber_id');
-            "
-        );
+        $sth = $_[0]->prepare($self->{log_detailed});
         $sth->execute();
         $sth->finish();
     }

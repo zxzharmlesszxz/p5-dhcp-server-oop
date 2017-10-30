@@ -8,35 +8,16 @@ use Server;
 
 my $server;
 my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID, $THREADS_COUNT, $DBDATASOURCE, $DBLOGIN, $DBPASS, $PIDFILE, $DEBUG, $DAEMON);
-my $get_requested_data = "SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '$mac' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '$ipaddr' LIMIT 1;";
-my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '$dhcp_opt82_vlan_id' AND `subnets`.`type` = 'guest' AND `ips`.`lease_time` = '' LIMIT 1;";
-my $get_routing = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '$_[2]' LIMIT 30;";
-my $lease_offered = "UPDATE `ips` SET `mac` = '$mac', `lease_time` = UNIX_TIMESTAMP()+3600 WHERE `ip` = '".$_[2]->yiaddr()."';";
+
+my $get_requested_data = "SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '\$mac' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '\$ipaddr' LIMIT 1;";
+my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '\$dhcp_opt82_vlan_id' AND `subnets`.`type` = 'guest' AND `ips`.`lease_time` = '' LIMIT 1;";
+my $get_routing = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '\$_[2]' LIMIT 30;";
+my $lease_offered = "UPDATE `ips` SET `mac` = '\$mac', `lease_time` = UNIX_TIMESTAMP()+3600 WHERE `ip` = '" . \$_[2]->yiaddr() . "';";
 my $lease_nak = "";
-my $lease_decline = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(),'$mac','$client_ip','$gateway_ip','$client_ident','$requested_ip','$hostname', '$dhcp_vendor_class','$dhcp_user_class','$dhcp_opt82_chasis_id','$dhcp_opt82_unit_id', '$dhcp_opt82_port_id','$dhcp_opt82_vlan_id','$dhcp_opt82_subscriber_id');";
-my $lease_release = "UPDATE `ips` SET `lease_time` = '', `mac` = NULL WHERE `mac` ='$mac';";
-my $lease_success = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='$mac' WHERE `ip` = (SELECT `ip` FROM `clients` WHERE `mac` = '$mac' AND`subnet_id` = (SELECT `subnet_id` FROM `subnets` WHERE `vlan_id` = $dhcp_opt82_vlan_id AND `type` != 'guest'));";
-my $log_detailed = "INSERT INTO `dhcp_log`
-                (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`,
-                `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`,
-                `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`)
-            VALUES
-                (NOW(),'$mac','$client_ip','$gateway_ip','$client_ident','$requested_ip','$hostname',
-                '$dhcp_vendor_class','$dhcp_user_class','$dhcp_opt82_chasis_id','$dhcp_opt82_unit_id',
-                '$dhcp_opt82_port_id','$dhcp_opt82_vlan_id','$dhcp_opt82_subscriber_id')
-            ON DUPLICATE KEY UPDATE
-                `client_ip`                 = '$client_ip',
-                `client_ident`              = '$client_ident',
-                `requested_ip`              = '$requested_ip',
-                `hostname`                  = '$hostname',
-                `dhcp_vendor_class`         = '$dhcp_vendor_class',
-                `dhcp_user_class`           = '$dhcp_user_class',
-                `gateway_ip`                = if('$gateway_ip' = '0.0.0.0', `gateway_ip`, '$gateway_ip'),
-                `dhcp_opt82_chasis_id`      = if('$dhcp_opt82_chasis_id' = '', `dhcp_opt82_chasis_id`, '$dhcp_opt82_chasis_id'),
-                `dhcp_opt82_unit_id`        = if('$dhcp_opt82_unit_id' = '', `dhcp_opt82_unit_id`, '$dhcp_opt82_unit_id'),
-                `dhcp_opt82_port_id`        = if('$dhcp_opt82_port_id' = '', `dhcp_opt82_port_id`, '$dhcp_opt82_port_id'),
-                `dhcp_opt82_vlan_id`        = if('$dhcp_opt82_vlan_id' = '', `dhcp_opt82_vlan_id`, '$dhcp_opt82_vlan_id'),
-                `dhcp_opt82_subscriber_id`  = if('$dhcp_opt82_subscriber_id' = '', `dhcp_opt82_subscriber_id`, '$dhcp_opt82_subscriber_id');";
+my $lease_decline = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(),'\$mac','\$client_ip','\$gateway_ip','\$client_ident','\$requested_ip','\$hostname', '\$dhcp_vendor_class','\$dhcp_user_class','\$dhcp_opt82_chasis_id','\$dhcp_opt82_unit_id', '\$dhcp_opt82_port_id','\$dhcp_opt82_vlan_id','\$dhcp_opt82_subscriber_id');";
+my $lease_release = "UPDATE `ips` SET `lease_time` = '', `mac` = NULL WHERE `mac` ='\$mac';";
+my $lease_success = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='\$mac' WHERE `ip` = (SELECT `ip` FROM `clients` WHERE `mac` = '\$mac' AND`subnet_id` = (SELECT `subnet_id` FROM `subnets` WHERE `vlan_id` = \$dhcp_opt82_vlan_id AND `type` != 'guest'));";
+my $log_detailed = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(),'\$mac','\$client_ip','\$gateway_ip','\$client_ident','\$requested_ip','\$hostname', '\$dhcp_vendor_class','\$dhcp_user_class','\$dhcp_opt82_chasis_id','\$dhcp_opt82_unit_id', '\$dhcp_opt82_port_id','\$dhcp_opt82_vlan_id','\$dhcp_opt82_subscriber_id') ON DUPLICATE KEY UPDATE `client_ip` = '\$client_ip', `client_ident` = '\$client_ident', `requested_ip` = '\$requested_ip', `hostname` = '\$hostname', `dhcp_vendor_class` = '\$dhcp_vendor_class', `dhcp_user_class` = '\$dhcp_user_class', `gateway_ip` = if('\$gateway_ip' = '0.0.0.0', `gateway_ip`, '\$gateway_ip'), `dhcp_opt82_chasis_id` = if('\$dhcp_opt82_chasis_id' = '', `dhcp_opt82_chasis_id`, '\$dhcp_opt82_chasis_id'), `dhcp_opt82_unit_id` = if('\$dhcp_opt82_unit_id' = '', `dhcp_opt82_unit_id`, '\$dhcp_opt82_unit_id'), `dhcp_opt82_port_id` = if('\$dhcp_opt82_port_id' = '', `dhcp_opt82_port_id`, '\$dhcp_opt82_port_id'), `dhcp_opt82_vlan_id` = if('\$dhcp_opt82_vlan_id' = '', `dhcp_opt82_vlan_id`, '\$dhcp_opt82_vlan_id'), `dhcp_opt82_subscriber_id` = if('\$dhcp_opt82_subscriber_id' = '', `dhcp_opt82_subscriber_id`, '\$dhcp_opt82_subscriber_id');";
 
 &start();
 
@@ -87,6 +68,15 @@ sub start {
     $server->set('THREADS_COUNT', $THREADS_COUNT);
     $server->set('PIDFILE', $PIDFILE);
     $server->set('DAEMON', $DAEMON);
+    $server->set('get_requested_data', $get_requested_data);
+    $server->set('get_requested_data_opt82', $get_requested_data_opt82);
+    $server->set('get_routing', $get_routing);
+    $server->set('lease_offered', $lease_offered);
+    $server->set('lease_nak', $lease_nak);
+    $server->set('lease_decline', $lease_decline);
+    $server->set('lease_release', $lease_release);
+    $server->set('lease_success', $lease_success);
+    $server->set('log_detailed', $log_detailed);
 }
 
 sub usage {
