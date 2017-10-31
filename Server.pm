@@ -400,7 +400,7 @@ package Server; {
         return(0) if (defined($_[0]->getOptionRaw(DHO_DHCP_AGENT_OPTIONS())) == 0);
 
         @RelayAgent = $_[0]->decodeRelayAgent($_[0]->getOptionRaw(DHO_DHCP_AGENT_OPTIONS()));
-        $self->logger("RelayAgent: " . @RelayAgent);
+        $self->logger("RelayAgent: " . @RelayAgent) if ($self->{DEBUG} > 1);
 
         for (my $i = 0; defined($RelayAgent[$i]); $i += 2) {
             if ($RelayAgent[$i] == 1) {
