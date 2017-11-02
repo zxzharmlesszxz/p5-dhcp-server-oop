@@ -911,7 +911,7 @@ package Server; {
         $sth = $_[0]->prepare(sprintf($self->{lease_release}, $mac, $ip));
         $sth->execute();
         $sth->finish();
-        $self->logger(sprintf("LEASE: Release IP=%s from MAC=%s", $ip, $mac)));
+        $self->logger(sprintf("LEASE: Release IP=%s from MAC=%s", $ip, $mac));
 
         return (0);
     }
