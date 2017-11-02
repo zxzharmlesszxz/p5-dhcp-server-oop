@@ -718,8 +718,6 @@ package Server; {
             #}
         }
 
-        $sth->finish();
-
         return (0);
     }
 
