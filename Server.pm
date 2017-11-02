@@ -51,8 +51,8 @@ package Server; {
             RUNNING                        => 0,
             get_requested_data_client      => '',
             get_requested_data_relay       => '',
+            get_requested_data_guest       => '',
             get_requested_data_opt82       => '',
-            get_requested_data_opt82_renew => '',
             get_routing                    => '',
             lease_offered                  => '',
             lease_nak                      => '',
@@ -675,47 +675,28 @@ package Server; {
         if ($self->{DEBUG} > 1) {
             if ($port == 68) {
                 $self->logger("Got a packet from guest client src = $ipaddr:$port");
+                $self->logger(sprintf("SQL: $self->{get_requested_data_guest}", $mac, $ipaddr)) if ($self->{DEBUG} > 1);
+                $sth = $_[0]->prepare(sprintf($self->{get_requested_data_guest}, $mac, $ipaddr));
             }
             else {
                 $self->logger("Got a packet from guest relay src = $ipaddr:$port");
+                if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
+                    $self->logger(sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
+                    $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
+                }
             }
         }
 
-        if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
-            # try work as traditional DHCP: find scope by opt82 info, then give some free addr
+        $sth->execute();
 
-            #if ($dhcp_opt82_chasis_id ne '') { Not needed GetRelayAgentOptions checks all params
-            $self->logger(sprintf("SQL: $self->{get_requested_data_opt82_renew}", $dhcp_opt82_vlan_id,
-                $mac)) if ($self->{DEBUG} > 1);
-            $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82_renew}, $dhcp_opt82_vlan_id, $mac));
-            $sth->execute();
-
-            if ($sth->rows()) {
-                $result = $sth->fetchrow_hashref();
-                $_[2]->yiaddr($result->{ip});
-                $self->db_data_to_reply($result, $dhcpreqparams, $_[2]);
-                $self->db_get_routing($_[0], $dhcpreqparams, $result->{subnet_id}, $_[2]);
-                $self->static_data_to_reply($dhcpreqparams, $_[2]);
-                $sth->finish();
-                return (1);
-            }
-
-            $self->logger(sprintf("SQL: $self->{get_requested_data_opt82}",
-                $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
-            $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
-            $sth->execute();
-
-            if ($sth->rows()) {
-                $result = $sth->fetchrow_hashref();
-                $_[2]->yiaddr($result->{ip});
-                $self->db_data_to_reply($result, $dhcpreqparams, $_[2]);
-                $self->db_get_routing($_[0], $dhcpreqparams, $result->{subnet_id}, $_[2]);
-                $self->static_data_to_reply($dhcpreqparams, $_[2]);
-                $sth->finish();
-                return (1);
-            }
-            #}
+        if ($sth->rows()) {
+            $result = $sth->fetchrow_hashref();
+            $_[2]->yiaddr($result->{ip});
+            $self->db_data_to_reply($result, $dhcpreqparams, $_[2]);
+            $self->db_get_routing($_[0], $dhcpreqparams, $result->{subnet_id}, $_[2]);
+            $self->static_data_to_reply($dhcpreqparams, $_[2]);
+            $sth->finish();
+            return (1);
         }
 
         return (0);
