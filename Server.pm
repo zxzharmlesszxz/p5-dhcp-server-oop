@@ -869,7 +869,7 @@ package Server; {
         $client_ip = $_[1]->ciaddr();
         $gateway_ip = $_[1]->giaddr();
         #$client_ident = defined($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) ? $self->BuffToHEX($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) : '';
-        $client_ident = $self->BuffToHEX($self->get_req_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
+        $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
 
         #$requested_ip = defined($_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) ? $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) : '';
         $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
@@ -926,7 +926,7 @@ package Server; {
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $client_ident = $self->BuffToHEX($self->get_req_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
+        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
         my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
         my $hostname = $self->get_req_param($_[1], DHO_HOST_NAME());
         $dhcp_vendor_class = $self->get_req_param($_[1], DHO_VENDOR_CLASS_IDENTIFIER());
@@ -954,7 +954,7 @@ package Server; {
         $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $client_ip = $_[1]->ciaddr();
         $gateway_ip = $_[1]->giaddr();
-        $client_ident = $self->BuffToHEX($self->get_req_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
+        $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
         $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
         $hostname = $self->get_req_param($_[1], DHO_HOST_NAME());
         $dhcp_vendor_class = $self->get_req_param($_[1], DHO_VENDOR_CLASS_IDENTIFIER());
@@ -974,6 +974,14 @@ package Server; {
         # my $param = $_[1];
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionValue($_[1]) : '';
+    }
+
+    sub get_req_raw_param {
+        my ($self) = shift;
+        # my $dhcpreq = $_[0];
+        # my $param = $_[1];
+        $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+        return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionRaw($_[1]) : '';
     }
 }
 
