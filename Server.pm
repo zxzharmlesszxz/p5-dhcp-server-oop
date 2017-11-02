@@ -828,11 +828,12 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $dhcpreq = $_[1];
-        my ($mac, $sth);
+        my ($ip, $mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $sth = $_[0]->prepare(sprintf($self->{lease_release}, $mac));
-        $self->logger(sprintf("SQL: $self->{lease_release}", $mac)) if ($self->{DEBUG} > 1);
+        $ip = $_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS());
+        $sth = $_[0]->prepare(sprintf($self->{lease_release}, $mac, $ip));
+        $self->logger(sprintf("SQL: $self->{lease_release}", $mac, $ip)) if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
@@ -844,15 +845,16 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $dhcpreq = $_[1];
-        my ($mac, $sth, $result);
+        my ($ip, $mac, $sth, $result);
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
         $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
-        $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $mac, $dhcp_opt82_vlan_id));
-        $self->logger(sprintf("SQL: $self->{lease_success}", $mac, $mac, $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
+        $ip = $_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS());
+        $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $ip));
+        $self->logger(sprintf("SQL: $self->{lease_success}", $mac, $ip)) if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
     }
