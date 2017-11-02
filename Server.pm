@@ -114,11 +114,12 @@ package Server; {
 
     sub logger {
         my ($self) = shift;
-        syslog('info|local0', $_[0]);
+        my ($tid) = Thread->tid();
+        syslog('info|local0', "Thread $tid: $_[0]");
         if ($self->{DEBUG} == 0) {return;}
 
         print STDOUT strftime "[%d/%b/%Y %H:%M:%S] ", localtime;
-        print STDOUT $_[0] . "\n";
+        print STDOUT "Thread $tid: $_[0]\n";
     }
 
     sub daemon {
