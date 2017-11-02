@@ -842,7 +842,7 @@ package Server; {
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $sth = $_[0]->prepare(sprintf($self->{lease_offered}, $mac, $_[2]->yiaddr()));
 
-        $self->logger(sprintf("SQL: $self->{lease_offered}", $mac, $_[2]->yiaddr())) if ($self->{DEBUG} > 1);
+        $self->logger(sprintf("SQL: $self->{lease_offered}", $mac, $_[1]->ciaddr())) if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
