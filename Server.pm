@@ -7,8 +7,7 @@ package Server; {
     use strict;
     use utf8;
     use warnings;
-    use threads;
-    use threads::shared;
+    use Thread;
     use Socket;
     use DBI;
     use Net::DHCP::Packet;
@@ -84,7 +83,7 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         $self->set('RUNNING', 0);
         $self->stop();
-        $_->kill('KILL')->detach() foreach threads->list();
+        #$_->kill('KILL')->detach() foreach Thread->list();
     }
 
     sub start {
@@ -98,7 +97,7 @@ package Server; {
         $self->logger("BIND_ADDR: $self->{BIND_ADDR}, THREADS_COUNT: $self->{THREADS_COUNT}, PIDFILE: $self->{PIDFILE}");
 
         if (defined($self->{DAEMON})) {
-            $self->set('DEBUG', 0);
+            #$self->set('DEBUG', 0);
             $self->daemon();
         }
 
@@ -140,32 +139,43 @@ package Server; {
         $self->logger("Daemon mode");
     }
 
-    sub run {
+    sub write_pid {
         my ($self) = shift;
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
-        # write PID to file
         if (defined($self->{PIDFILE})) {
             open FILE, "> $self->{PIDFILE}" || $self->logger("PID file save error: $!");
             print FILE "$$\n";
             close FILE;
         }
+    }
 
-        # broadcast address
-        $self->{ADDR_BCAST} = sockaddr_in($self->{CLIENT_PORT},
-            INADDR_BROADCAST);# sockaddr_in($CLIENT_PORT, inet_aton('255.255.255.255'))
-        # set mirror address if defimed
-        if (defined($self->{MIRROR})) {$self->{ADDR_MIRROR} = sockaddr_in($self->{SERVER_PORT},
-            inet_aton($self->{MIRROR}));} # traff mirroring
-        # open listening socket
+    sub mirroring {
+        my ($self) = shift;
+        $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+        if (defined($self->{MIRROR})) {
+            $self->{ADDR_MIRROR} = sockaddr_in($self->{SERVER_PORT}, inet_aton($self->{MIRROR}));
+        }
+    }
+
+    sub open_socket {
+        my ($self) = shift;
+        $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         socket($self->{SOCKET_RCV}, PF_INET, SOCK_DGRAM, getprotobyname('udp')) || die "Socket creation error: $@\n";
         bind($self->{SOCKET_RCV}, sockaddr_in($self->{SERVER_PORT}, inet_aton($self->{BIND_ADDR}))) || die "bind: $!";
+    }
+
+    sub run {
+        my ($self) = shift;
+        $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+        # write PID to file
+        $self->write_pid();
+        # broadcast address
+        $self->{ADDR_BCAST} = sockaddr_in($self->{CLIENT_PORT}, INADDR_BROADCAST);
+        $self->mirroring();
+        # open listening socket
+        $self->open_socket();
         # start threads
-        for my $i (1 .. ($self->{THREADS_COUNT} - 1)) {threads->create({ 'context' => 'void' },
-            sub {$self->request_loop});}
-        ### Collect the bits and pieces! ...
-        #$_->join foreach threads->list();
-        #$_->detach foreach threads->list();
-        # and handle request with other threads
+        for (1 .. ($self->{THREADS_COUNT} - 1)) {Thread->new({ 'context' => 'void' }, sub {$self->request_loop()});}
         $self->request_loop();
         # delete PID file on exit
         if (defined($self->{PIDFILE})) {unlink($self->{PIDFILE});}
@@ -178,14 +188,14 @@ package Server; {
         my ($buf, $fromaddr, $dhcpreq); # recv data
         my $dbh; # database connect
         my ($t0, $t1, $td); # perfomance data
-        my $tid = threads->tid(); # thread ID
-        $self->logger("Thread ($tid): START");
+        my $tid = Thread->tid(); # thread ID
+        $self->logger("START");
         # each thread make its own connection to DB
         # connect($data_source, $username, $password, \%attr)
         # dbi:DriverName:database=database_name;host=hostname;port=port
         until ($dbh = DBI->connect("DBI:" . $self->{DBDATASOURCE}, $self->{DBLOGIN}, $self->{DBPASS})) {
-            $self->logger("Thread ($tid): Could not connect to database: $DBI::errstr");
-            $self->logger("Thread ($tid): Sleeping 10 sec to retry");
+            $self->logger("Could not connect to database: $DBI::errstr");
+            $self->logger("Sleeping 10 sec to retry");
             sleep(10);
         }
 
@@ -203,7 +213,7 @@ package Server; {
             unless (defined sigprocmask(SIG_BLOCK, $sigset, $old_sigset)) {die "Could not unblock SIGINT\n";}
 
             $SIG{KILL} = sub {
-                $self->logger("Thread ($tid): END by sig handler");
+                $self->logger("END by sig handler");
                 $dbh->disconnect;
                 $self->stop();
                 $self->thread_exit(0);
@@ -216,16 +226,14 @@ package Server; {
             eval {
                 # catch fatal errors
                 # receive packet
-                $fromaddr = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger("Thread ($tid) recv err: $!");
+                $fromaddr = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger("recv err: $!");
 
                 next if ($!); # continue loop if an error occured
 
                 # filter to small packets
                 next if (length($buf) < 236); # 300
 
-                if ($self->{DEBUG} > 0) {
-                    $t0 = Benchmark->new;
-                }
+                if ($self->{DEBUG} > 0) {$t0 = Benchmark->new;}
 
                 # parce data to dhcp structes
                 $dhcpreq = Net::DHCP::Packet->new($buf);
@@ -244,9 +252,7 @@ package Server; {
                 next if (defined($dhcpreq->getOptionRaw(DHO_USER_CLASS())) && $dhcpreq->getOptionRaw(DHO_USER_CLASS()) eq "RRAS.Microsoft");
 
                 # send duplicate of received packet to mirror
-                if (defined($self->{ADDR_MIRROR})) {
-                    send($self->{SOCKET_RCV}, $buf, 0, $self->{ADDR_MIRROR}) || $self->logger("send mirr error: $!");
-                }
+                if (defined($self->{ADDR_MIRROR})) {send($self->{SOCKET_RCV}, $buf, 0, $self->{ADDR_MIRROR}) || $self->logger("send mirr error: $!");}
 
                 # print received packed
                 if ($self->{DEBUG} > 0) {
@@ -254,7 +260,7 @@ package Server; {
                     my $ipaddr = inet_ntoa($addr);
                     # change hw addr format
                     my $mac = $self->FormatMAC(substr($dhcpreq->chaddr(), 0, (2 * $dhcpreq->hlen())));
-                    $self->logger("Thread $tid: Got a packet src = $ipaddr:$port mac = $mac length = " . length($buf));
+                    $self->logger("Got a packet src = $ipaddr:$port mac = $mac length = " . length($buf));
                     $self->logger($dhcpreq->toString()) if ($self->{DEBUG} > 1);
                 }
 
@@ -272,11 +278,11 @@ package Server; {
                 if ($self->{DEBUG} > 0) {
                     $t1 = Benchmark->new;
                     $td = timediff($t1, $t0);
-                    $self->logger("Thread $tid: the code took: " . timestr($td));
+                    $self->logger("The code took: " . timestr($td));
                 }
             }; # end of 'eval' blocks
             if ($@) {
-                $self->logger("Thread $tid: Caught error in main loop: $@");
+                $self->logger("Caught error in main loop: $@");
             }
         }
 
@@ -288,11 +294,11 @@ package Server; {
     sub thread_exit($) {
         my ($self) = shift;
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
-        my $tid = threads->tid(); # thread ID
+        my $tid = Thread->tid(); # thread ID
 
-        $self->logger("Thread ($tid): END code: " . $_[0]);
+        $self->logger("END code: " . $_[0]);
 
-        threads->exit($_[0]) if threads->can('exit');
+        Thread->exit($_[0]) if Thread->can('exit');
         exit($_[0]);
     }
 
@@ -851,26 +857,41 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $dhcpreq = $_[1];
-        my ($mac, $sth);
+        # this function need to understand how to must work
+        #
+        #
+        my ($type, $mac, $sth);
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my ($client_ip, $gateway_ip, $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $client_ip = $_[1]->ciaddr;
         $gateway_ip = $_[1]->giaddr;
-        $client_ident = defined($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) ? $self->BuffToHEX($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) : '';
-        $requested_ip = defined($_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) ? $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) : '';
-        $hostname = defined($_[1]->getOptionRaw(DHO_HOST_NAME())) ? $_[1]->getOptionValue(DHO_HOST_NAME()) : '';
-        $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
-        $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
-        $sth = $_[0]->prepare(sprintf($self->{lease_decline}, $mac, $client_ip, $gateway_ip, $client_ident,
-            $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
+        #$client_ident = defined($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) ? $self->BuffToHEX($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) : '';
+        $client_ident = $self->BuffToHEX($self->get_req_param($_[1], 'DHO_DHCP_CLIENT_IDENTIFIER'));
+
+        #$requested_ip = defined($_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) ? $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) : '';
+        $requested_ip = $self->get_req_param($_[1], 'DHO_DHCP_REQUESTED_ADDRESS');
+
+        #$hostname = defined($_[1]->getOptionRaw(DHO_HOST_NAME())) ? $_[1]->getOptionValue(DHO_HOST_NAME()) : '';
+        $hostname = $self->get_req_param($_[1], 'DHO_HOST_NAME');
+
+        #$dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
+        $dhcp_vendor_class = $self->get_req_param($_[1], 'DHO_VENDOR_CLASS_IDENTIFIER');
+
+        #$dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
+        $dhcp_user_class = $self->get_req_param($_[1], 'DHO_USER_CLASS');
+
+        #$type = defined($_[1]->getOptionRaw(DHO_DHCP_MESSAGE_TYPE)) ? $_[1]->getOptionValue(DHO_DHCP_MESSAGE_TYPE()) : '';
+        $type = $self->get_req_param($_[1], 'DHO_DHCP_MESSAGE_TYPE');
+
         $self->logger(sprintf("SQL: $self->{lease_decline}", $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id)) if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare(sprintf($self->{lease_decline}, $mac, $client_ip, $gateway_ip, $client_ident,
+            $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
+            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
         $sth->finish();
 
@@ -885,11 +906,12 @@ package Server; {
         my ($ip, $mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $ip = $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS());
-        $sth = $_[0]->prepare(sprintf($self->{lease_release}, $mac, $ip));
+        $ip = $self->get_req_param($_[1], 'DHO_DHCP_REQUESTED_ADDRESS');
         $self->logger(sprintf("SQL: $self->{lease_release}", $mac, $ip)) if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare(sprintf($self->{lease_release}, $mac, $ip));
         $sth->execute();
         $sth->finish();
+        $self->logger(sprintf("LEASE: Release IP=%s from MAC=%s", $ip, $mac)));
 
         return (0);
     }
@@ -903,15 +925,20 @@ package Server; {
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
-        $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
+        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        my $client_ident = $self->BuffToHEX($self->get_req_param($_[1], 'DHO_DHCP_CLIENT_IDENTIFIER'));
+        my $requested_ip = $self->get_req_param($_[1], 'DHO_DHCP_REQUESTED_ADDRESS');
+        my $hostname = $self->get_req_param($_[1], 'DHO_HOST_NAME');
+        $dhcp_vendor_class = $self->get_req_param($_[1], 'DHO_VENDOR_CLASS_IDENTIFIER');
+        $dhcp_user_class = $self->get_req_param($_[1], 'DHO_USER_CLASS');
+        my $type = $self->get_req_param($_[1], 'DHO_DHCP_MESSAGE_TYPE');
         $ip = $_[1]->ciaddr;
-        $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $ip));
+        my $gateway_ip = $_[1]->giaddr;
         $self->logger(sprintf("SQL: $self->{lease_success}", $mac, $ip)) if ($self->{DEBUG} > 1);
+        $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $ip));
         $sth->execute();
         $sth->finish();
+        $self->logger(sprintf("LEASE: Success IP=%s for MAC=%s", $ip, $mac));
     }
 
     sub db_log_detailed {
@@ -919,28 +946,35 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $dhcpreq = $_[1];
-        my ($mac, $sth);
+        my ($type, $mac, $sth);
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my ($client_ip, $gateway_ip, $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $client_ip = $_[1]->ciaddr;
         $gateway_ip = $_[1]->giaddr;
-        $client_ident = defined($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) ? $self->BuffToHEX($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) : '';
-        $requested_ip = defined($_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) ? $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) : '';
-        $hostname = defined($_[1]->getOptionRaw(DHO_HOST_NAME())) ? $_[1]->getOptionValue(DHO_HOST_NAME()) : '';
-        $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
-        $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
+        $client_ident = $self->BuffToHEX($self->get_req_param($_[1], 'DHO_DHCP_CLIENT_IDENTIFIER'));
+        $requested_ip = $self->get_req_param($_[1], 'DHO_DHCP_REQUESTED_ADDRESS');
+        $hostname = $self->get_req_param($_[1], 'DHO_HOST_NAME');
+        $dhcp_vendor_class = $self->get_req_param($_[1], 'DHO_VENDOR_CLASS_IDENTIFIER');
+        $dhcp_user_class = $self->get_req_param($_[1], 'DHO_USER_CLASS');
+        $type = $self->get_req_param($_[1], 'DHO_DHCP_MESSAGE_TYPE');
 
-        $sth = $_[0]->prepare(sprintf($self->{log_detailed}, $mac, $client_ip, $gateway_ip, $client_ident,
+        $sth = $_[0]->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
         $sth->finish();
     }
 
+    sub get_req_param {
+        my ($self) = shift;
+        # my $dhcpreq = $_[0];
+        # my $param = $_[1];
+        $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+        return defined($_[0]->getOptionRaw($_[1]())) ? $_[0]->getOptionValue($_[1]()) : '';
+    }
 }
 
 1;

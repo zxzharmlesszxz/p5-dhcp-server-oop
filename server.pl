@@ -1,8 +1,6 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
 use strict;
 use warnings FATAL => 'all';
-#use utf8;
-#use POSIX qw(setsid setuid strftime :signal_h);
 use Getopt::Long;
 use Server;
 
@@ -18,10 +16,10 @@ my $get_requested_data_opt82        = "SELECT * FROM `subnets`, `ips` WHERE `sub
 my $get_routing                     = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;";
 my $lease_offered                   = "UPDATE `ips` SET `mac` = '%s', `lease_time` = UNIX_TIMESTAMP()+3600 WHERE `ip` = '%s';";
 my $lease_nak                       = "UPDATE `ips` SET `lease_time` = '', `mac` = NULL WHERE `mac` ='%s' AND `ip` = '%s';";
-my $lease_decline                   = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');";
+my $lease_decline                   = "INSERT INTO `dhcp_log` (`created`, `type`, `client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');";
 my $lease_release                   = "UPDATE `ips` SET `lease_time` = '', `mac` = NULL WHERE `mac` ='%s' AND `ip` = '%s';";
 my $lease_success                   = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='%s' WHERE `ip` = '%s';";
-my $log_detailed                    = "INSERT INTO `dhcp_log` (`created`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');";
+my $log_detailed                    = "INSERT INTO `dhcp_log` (`created`,`type`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');";
 
 &start();
 
