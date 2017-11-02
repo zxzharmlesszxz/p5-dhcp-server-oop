@@ -854,11 +854,12 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $dhcpreq = $_[1];
-        my ($mac, $sth);
+        my ($ip, $mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $sth = $_[0]->prepare($self->{lease_nak});
-        $self->logger("SQL: $self->{lease_nak}") if ($self->{DEBUG} > 1);
+        $ip = $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS());
+        $sth = $_[0]->prepare(sprintf("SQL: $self->{lease_nak}", $mac, $ip));
+        $self->logger(sprintf("SQL: $self->{lease_nak}", $mac, $ip)) if ($self->{DEBUG} > 1);
         $sth->execute();
         $sth->finish();
 
