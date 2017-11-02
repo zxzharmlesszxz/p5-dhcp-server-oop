@@ -936,11 +936,7 @@ package Server; {
 
         $sth = $_[0]->prepare(sprintf($self->{log_detailed}, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id, $client_ip, $client_ident,
-            $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $gateway_ip, $gateway_ip,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id,
-            $dhcp_opt82_subscriber_id));
+            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
         $sth->finish();
     }
