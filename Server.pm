@@ -645,7 +645,7 @@ package Server; {
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
             # try work as traditional DHCP: find scope by opt82 info, then give some free addr
 
-            if ($dhcp_opt82_chasis_id ne '') {
+            #if ($dhcp_opt82_chasis_id ne '') {
                 $self->logger(sprintf("SQL: $self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
                 $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
                 $sth->execute();
@@ -658,7 +658,7 @@ package Server; {
                     $sth->finish();
                     return (1);
                 }
-            }
+            #}
         }
 
         $sth->finish();
