@@ -541,17 +541,13 @@ package Server; {
         my ($dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[2]);
 
-        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp, $_[1]) == 1 ||
-            $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 1) {
-            if ((defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) &&
-                $_[2]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
-                (defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) == 0
-                    && $_[2]->ciaddr() ne $dhcpresp->yiaddr())) {
+        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp, $_[1]) == 1 || $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 1) {
+            if ((defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) && $_[2]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || (defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) == 0 && $_[2]->ciaddr() ne $dhcpresp->yiaddr())) {
+                $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
+                $self->db_lease_nak($_[0], $_[2]);
                 # NAK if requested addr not equal IP addr in DB
                 $dhcpresp->ciaddr('0.0.0.0');
                 $dhcpresp->yiaddr('0.0.0.0');
-                $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-                $self->db_lease_nak($_[0], $_[2]);
             }
             else {
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
@@ -887,10 +883,10 @@ package Server; {
         #$type = defined($_[1]->getOptionRaw(DHO_DHCP_MESSAGE_TYPE)) ? $_[1]->getOptionValue(DHO_DHCP_MESSAGE_TYPE()) : '';
         $type = $self->get_req_param($_[1], DHO_DHCP_MESSAGE_TYPE());
 
-        $self->logger(sprintf("SQL: $self->{lease_decline}", $mac, $client_ip, $gateway_ip, $client_ident,
+        $self->logger(sprintf("SQL: $self->{lease_decline}", $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id)) if ($self->{DEBUG} > 1);
-        $sth = $_[0]->prepare(sprintf($self->{lease_decline}, $mac, $client_ip, $gateway_ip, $client_ident,
+        $sth = $_[0]->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
