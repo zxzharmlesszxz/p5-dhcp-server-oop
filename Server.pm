@@ -583,7 +583,8 @@ package Server; {
         $dhcpresp = $self->GenDHCPRespPkt($_[2]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
 
-        if ($self->db_get_requested_data($_[0], $_[2], $dhcpresp, $_[1]) == 0) {
+        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp, $_[1]) == 0 ||
+            $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 0) {
             $dhcpreqparams = $_[2]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
             $self->static_data_to_reply($dhcpreqparams, $dhcpresp);
         }
