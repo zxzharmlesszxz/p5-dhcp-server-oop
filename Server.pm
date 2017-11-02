@@ -844,7 +844,7 @@ package Server; {
         my ($ip, $mac, $sth);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $ip = $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS());
+        $ip = $_[1]->ciaddr();
         $sth = $_[0]->prepare(sprintf("SQL: $self->{lease_nak}", $mac, $ip));
         $self->logger(sprintf("SQL: $self->{lease_nak}", $mac, $ip)) if ($self->{DEBUG} > 1);
         $sth->execute();
