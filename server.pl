@@ -9,7 +9,8 @@ use Server;
 my $server;
 my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID, $THREADS_COUNT, $DBDATASOURCE, $DBLOGIN, $DBPASS, $PIDFILE, $DEBUG, $DAEMON);
 
-my $get_requested_data = "SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '%s' LIMIT 1;";
+my $get_requested_data_client = "SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `clients`.`ip` = '%s' LIMIT 1;";
+my $get_requested_data_relay = "SELECT * FROM `clients`, `subnets` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '%s' LIMIT 1;";
 my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`type` = 'guest' AND `ips`.`lease_time` = '' LIMIT 1;";
 my $get_routing = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;";
 my $lease_offered = "UPDATE `ips` SET `mac` = '%s', `lease_time` = UNIX_TIMESTAMP()+3600 WHERE `ip` = '%s';";
@@ -59,7 +60,8 @@ sub start {
     $server->set('THREADS_COUNT', $THREADS_COUNT);
     $server->set('PIDFILE', $PIDFILE);
     $server->set('DAEMON', $DAEMON);
-    $server->set('get_requested_data', $get_requested_data);
+    $server->set('get_requested_data_client', $get_requested_data_client);
+    $server->set('get_requested_data_relay', $get_requested_data_relay);
     $server->set('get_requested_data_opt82', $get_requested_data_opt82);
     $server->set('get_routing', $get_routing);
     $server->set('lease_offered', $lease_offered);

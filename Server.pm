@@ -49,7 +49,8 @@ package Server; {
             DEBUG => 0,
             DAEMON => undef,
             RUNNING => 0,
-            get_requested_data => '',
+            get_requested_data_client => '',
+            get_requested_data_relay => '',
             get_requested_data_opt82 => '',
             get_routing => '',
             lease_offered => '',
@@ -615,11 +616,17 @@ package Server; {
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $dhcpreqparams = $_[1]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
-        $sth = $_[0]->prepare(sprintf($self->{get_requested_data}, $mac, $ipaddr));
 
         if ($self->{DEBUG} > 1) {
-            $self->logger("Got a packet src = $ipaddr:$port");
-            $self->logger(sprintf("SQL: $self->{get_requested_data}", $mac, $ipaddr));
+            if ($port == 68) {
+                $self->logger("Got a packet from client src = $ipaddr:$port");
+                $self->logger(sprintf("SQL: $self->{get_requested_data_client}", $mac, $ipaddr));
+                $sth = $_[0]->prepare(sprintf($self->{get_requested_data_client}, $mac, $ipaddr));
+            } else {
+                $self->logger("Got a packet from relay src = $ipaddr:$port");
+                $self->logger(sprintf("SQL: $self->{get_requested_data_relay}", $mac, $ipaddr));
+                $sth = $_[0]->prepare(sprintf($self->{get_requested_data_relay}, $mac, $ipaddr));
+            }
         }
 
         $sth->execute();
@@ -639,8 +646,8 @@ package Server; {
             # try work as traditional DHCP: find scope by opt82 info, then give some free addr
 
             if ($dhcp_opt82_chasis_id ne '') {
-                $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
                 $self->logger(sprintf("SQL: $self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
+                $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
                 $sth->execute();
 
                 if ($sth->rows()) {
