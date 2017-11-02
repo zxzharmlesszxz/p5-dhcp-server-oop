@@ -623,7 +623,6 @@ package Server; {
         my ($port, $addr) = unpack_sockaddr_in($_[3]);
         my $ipaddr = inet_ntoa($addr);
         my ($mac, $sth, $dhcpreqparams, $result);
-        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $dhcpreqparams = $_[1]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
@@ -694,6 +693,7 @@ package Server; {
 
             if ($sth->rows()) {
                 $result = $sth->fetchrow_hashref();
+                $_[2]->yiaddr($result->{ip});
                 $self->db_data_to_reply($result, $dhcpreqparams, $_[2]);
                 $self->db_get_routing($_[0], $dhcpreqparams, $result->{subnet_id}, $_[2]);
                 $self->static_data_to_reply($dhcpreqparams, $_[2]);
@@ -708,6 +708,7 @@ package Server; {
 
             if ($sth->rows()) {
                 $result = $sth->fetchrow_hashref();
+                $_[2]->yiaddr($result->{ip});
                 $self->db_data_to_reply($result, $dhcpreqparams, $_[2]);
                 $self->db_get_routing($_[0], $dhcpreqparams, $result->{subnet_id}, $_[2]);
                 $self->static_data_to_reply($dhcpreqparams, $_[2]);
