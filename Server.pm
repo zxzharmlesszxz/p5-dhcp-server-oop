@@ -73,7 +73,7 @@ package Server; {
         $param = shift;
         $value = shift;
         if ($value && $value ne '' ) {
-            $self->logger("Set: $param = '$value' " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+            $self->logger("Set: $param = '$value'") if ($self->{DEBUG} > 1);
             $self->{$param} = $value;
         }
     }
