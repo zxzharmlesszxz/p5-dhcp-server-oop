@@ -83,7 +83,7 @@ package Server; {
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
         $self->set('RUNNING', 0);
         $self->stop();
-        #$_->kill('KILL')->detach() foreach Thread->list();
+        $_->kill('KILL')->detach() foreach Thread->list();
     }
 
     sub start {
