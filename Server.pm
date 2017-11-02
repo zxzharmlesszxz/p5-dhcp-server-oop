@@ -859,7 +859,7 @@ package Server; {
         $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $dhcp_vendor_class = defined($_[1]->getOptionRaw(DHO_VENDOR_CLASS_IDENTIFIER())) ? $_[1]->getOptionValue(DHO_VENDOR_CLASS_IDENTIFIER()) : '';
         $dhcp_user_class = defined($_[1]->getOptionRaw(DHO_USER_CLASS())) ? $_[1]->getOptionRaw(DHO_USER_CLASS()) : '';
-        $ip = $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS());
+        $ip = $_[1]->ciaddr;
         $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $ip));
         $self->logger(sprintf("SQL: $self->{lease_success}", $mac, $ip)) if ($self->{DEBUG} > 1);
         $sth->execute();
