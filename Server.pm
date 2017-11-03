@@ -497,12 +497,14 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(2, "Got DISCOVER from giaddr = " . $_[1]->giaddr() .
                 " for MAC = " . $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))) .
-                " and wont IP = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) . "send OFFER");
+                " and wont IP = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) . " send OFFER");
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
         my ($dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
+
+        $self->db_check_requested_data($_[0], $_[1]);
 
         if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 ||
             $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
@@ -584,6 +586,22 @@ package Server; {
         }
 
         $self->send_reply($_[0], $_[1], $dhcpresp);
+    }
+
+    sub db_check_requested_data {
+        my ($self) = shift;
+        $self->logger(3, "Function: " . (caller(0))[3]);
+        #my $fromaddr = $_[0];
+        #my $dhcpreq = $_[1];
+        my ($port, $addr) = unpack_sockaddr_in($_[0]);
+        my $ipaddr = inet_ntoa($addr);
+        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
+        my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
+        my $yiaddr = $_[1]->yiaddr();
+        my $ciaddr = $_[1]->ciaddr();
+        my $giaddr = $_[1]->giaddr();
+        $self->logger(3, "ipaddr = $ipaddr port = $port mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
+        return;
     }
 
     sub static_data_to_reply {
