@@ -268,7 +268,7 @@ package Server; {
                     $self->logger(2, $dhcpreq->toString());
                 }
 
-                $self->db_log_detailed($dbh, $dhcpreq);
+                $self->db_log_detailed($dhcpreq);
 
                 # handle packet
                 my $type = $dhcpreq->getOptionValue(DHO_DHCP_MESSAGE_TYPE());
@@ -824,28 +824,27 @@ package Server; {
     sub db_lease_decline {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $dbh = $_[0];
-        #my $dhcpreq = $_[1];
+        #my $dhcpreq = $_[0];
         # this function need to understand how to must work
         #
         #
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        my $client_ip = $_[1]->ciaddr();
-        my $gateway_ip = $_[1]->giaddr();
-        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
-        my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
-        my $hostname = $self->get_req_param($_[1], DHO_HOST_NAME());
-        my $dhcp_vendor_class = $self->get_req_param($_[1], DHO_VENDOR_CLASS_IDENTIFIER());
-        my $dhcp_user_class = $self->get_req_param($_[1], DHO_USER_CLASS());
-        my $type = $self->get_req_param($_[1], DHO_DHCP_MESSAGE_TYPE());
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
+        my $client_ip = $_[0]->ciaddr();
+        my $gateway_ip = $_[0]->giaddr();
+        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()));
+        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
+        my $hostname = $self->get_req_param($_[0], DHO_HOST_NAME());
+        my $dhcp_vendor_class = $self->get_req_param($_[0], DHO_VENDOR_CLASS_IDENTIFIER());
+        my $dhcp_user_class = $self->get_req_param($_[0], DHO_USER_CLASS());
+        my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
+        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
         $self->logger(2, sprintf("SQL: $self->{lease_decline}", $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
-        my $sth = $_[0]->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
@@ -872,22 +871,21 @@ package Server; {
     sub db_lease_success {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $dbh = $_[0];
-        #my $dhcpreq = $_[1];
+        #my $dhcpreq = $_[0];
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
-        my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
-        my $hostname = $self->get_req_param($_[1], DHO_HOST_NAME());
-        my $dhcp_vendor_class = $self->get_req_param($_[1], DHO_VENDOR_CLASS_IDENTIFIER());
-        my $dhcp_user_class = $self->get_req_param($_[1], DHO_USER_CLASS());
-        my $type = $self->get_req_param($_[1], DHO_DHCP_MESSAGE_TYPE());
-        my $ip = $_[1]->ciaddr();
-        my $gateway_ip = $_[1]->giaddr();
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
+        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()));
+        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
+        my $hostname = $self->get_req_param($_[0], DHO_HOST_NAME());
+        my $dhcp_vendor_class = $self->get_req_param($_[0], DHO_VENDOR_CLASS_IDENTIFIER());
+        my $dhcp_user_class = $self->get_req_param($_[0], DHO_USER_CLASS());
+        my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
+        my $ip = $_[0]->ciaddr();
+        my $gateway_ip = $_[0]->giaddr();
+        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->logger(2, sprintf("SQL: $self->{lease_success}", $mac, $ip));
-        my $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $ip));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_success}, $mac, $ip));
         $sth->execute();
         $sth->finish();
         $self->logger(0, sprintf("LEASE: Success IP=%s for MAC=%s", $ip, $mac));
@@ -896,21 +894,20 @@ package Server; {
     sub db_log_detailed {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $dbh = $_[0];
-        #my $dhcpreq = $_[1];
+        #my $dhcpreq = $_[0];
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        my $client_ip = $_[1]->ciaddr();
-        my $gateway_ip = $_[1]->giaddr();
-        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
-        my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
-        my $hostname = $self->get_req_param($_[1], DHO_HOST_NAME());
-        my $dhcp_vendor_class = $self->get_req_param($_[1], DHO_VENDOR_CLASS_IDENTIFIER());
-        my $dhcp_user_class = $self->get_req_param($_[1], DHO_USER_CLASS());
-        my $type = $self->get_req_param($_[1], DHO_DHCP_MESSAGE_TYPE());
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
+        my $client_ip = $_[0]->ciaddr();
+        my $gateway_ip = $_[0]->giaddr();
+        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()));
+        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
+        my $hostname = $self->get_req_param($_[0], DHO_HOST_NAME());
+        my $dhcp_vendor_class = $self->get_req_param($_[0], DHO_VENDOR_CLASS_IDENTIFIER());
+        my $dhcp_user_class = $self->get_req_param($_[0], DHO_USER_CLASS());
+        my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
+        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $sth = $_[0]->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
+        my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
