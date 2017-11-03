@@ -497,7 +497,7 @@ package Server; {
         my ($self) = shift;
         #my $dhcpreq = $_[0];
         $self->logger(3, "Function: " . (caller(0))[3]);
-        return ($self->get_req_param($_[0], DHO_DHCP_SERVER_IDENTIFIER()) eq $self->{DHCP_SERVER_ID});
+        return ($self->get_req_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()) eq $self->{DHCP_SERVER_ID}) ? 1 : 0;
     }
 
     sub handle_discover {
