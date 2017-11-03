@@ -533,7 +533,7 @@ package Server; {
         #my $fromaddr  = $_[1];
         #my $dhcpreq = $_[2];
         my $dhcpresp = $self->GenDHCPRespPkt($_[2]);
-        my ($port, $addr) = unpack_sockaddr_in($_[3]);
+        my ($port, $addr) = unpack_sockaddr_in($_[1]);
         my $ipaddr = inet_ntoa($addr);
         # change hw addr format
         my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
