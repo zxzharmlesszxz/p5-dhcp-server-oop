@@ -259,6 +259,8 @@ package Server; {
                 $self->send_mirror($buf);
                 # print received packed
                 $self->logger(2, $dhcpreq->toString());
+                $self->logger(3, sprintf("DHO_USER_CLASS value = ", $self->get_req_param($dhcpreq, DHO_USER_CLASS())));
+                $self->logger(3, sprintf("DHO_USER_CLASS raw = ", $self->get_req_raw_param($dhcpreq, DHO_USER_CLASS())));
                 $self->db_log_detailed($dhcpreq);
 
                 # handle packet
