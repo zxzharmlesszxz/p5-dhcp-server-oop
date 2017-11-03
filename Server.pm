@@ -261,6 +261,8 @@ package Server; {
                 $self->logger(2, $dhcpreq->toString());
                 $self->logger(3, sprintf("DHO_USER_CLASS value = %s", $self->get_req_param($dhcpreq, DHO_USER_CLASS())));
                 $self->logger(3, sprintf("DHO_USER_CLASS raw = %s", $self->get_req_raw_param($dhcpreq, DHO_USER_CLASS())));
+                $self->logger(3, sprintf("DHO_DHCP_MESSAGE_TYPE value = %s", $self->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE())));
+                $self->logger(3, sprintf("DHO_DHCP_MESSAGE_TYPE raw = %s", $self->get_req_raw_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE())));
                 $self->db_log_detailed($dhcpreq);
 
                 # handle packet
