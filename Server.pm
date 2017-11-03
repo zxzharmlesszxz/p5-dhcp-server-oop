@@ -919,7 +919,7 @@ package Server; {
         $sth = $_[0]->prepare(sprintf($self->{lease_success}, $mac, $ip));
         $sth->execute();
         $sth->finish();
-        $self->logger(sprintf("LEASE: Success IP=%s for MAC=%s", $ip, $mac));
+        $self->logger(0, sprintf("LEASE: Success IP=%s for MAC=%s", $ip, $mac));
     }
 
     sub db_log_detailed {
