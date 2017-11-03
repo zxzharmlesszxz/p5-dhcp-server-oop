@@ -812,8 +812,8 @@ package Server; {
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(0, "yiaddr = ".$_[2]->yiaddr().", ciaddr = ".$_[2]->ciaddr());
-        $self->logger(2, sprintf("SQL: $self->{lease_offered}", $mac, $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());));
-        $sth = $_[0]->prepare(sprintf($self->{lease_offered}, $mac, $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());));
+        $self->logger(2, sprintf("SQL: $self->{lease_offered}", $mac, $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS())));
+        $sth = $_[0]->prepare(sprintf($self->{lease_offered}, $mac, $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS())));
         $sth->execute();
         $sth->finish();
 
