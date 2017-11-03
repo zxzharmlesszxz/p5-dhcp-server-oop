@@ -504,7 +504,7 @@ package Server; {
 
         if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 ||
             $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
-            $self->send_reply($_[0], $_[0], $dhcpresp);
+            $self->send_reply($_[0], $_[1], $dhcpresp);
             $self->db_lease_offered($_[0], $dhcpresp);
         }
         else {# if AUTO_CONFIGURE (116) supported - send disable generate link local addr
