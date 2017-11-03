@@ -871,7 +871,7 @@ package Server; {
         my $dhcp_vendor_class = $self->get_req_param($_[0], DHO_VENDOR_CLASS_IDENTIFIER());
         my $dhcp_user_class = $self->get_req_param($_[0], DHO_USER_CLASS());
         my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
-        my $ip = ($_[0]->ciaddr() == '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
+        my $ip = ($_[0]->ciaddr() eq '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
         my $gateway_ip = $_[0]->giaddr();
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
