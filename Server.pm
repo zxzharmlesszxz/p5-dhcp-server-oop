@@ -849,7 +849,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $dhcpreq = $_[0];
         my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        my $ip = $_[0]-ciaddr();
+        my $ip = $_[0]->ciaddr();
         $self->logger(2, sprintf("SQL: $self->{lease_release}", $mac, $ip));
         my $sth = $self->{dbh}->prepare(sprintf($self->{lease_release}, $mac, $ip));
         $sth->execute();
