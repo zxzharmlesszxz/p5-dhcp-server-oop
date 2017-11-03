@@ -256,18 +256,9 @@ package Server; {
                 next if (defined($dhcpreq->getOptionRaw(DHO_USER_CLASS())) && $dhcpreq->getOptionRaw(DHO_USER_CLASS()) eq "RRAS.Microsoft");
 
                 # send duplicate of received packet to mirror
-                send($self->{SOCKET_RCV}, $buf, 0, $self->{ADDR_MIRROR}) || $self->logger(0, "send mirr error: $!") if (defined($self->{ADDR_MIRROR}));
-
+                $self->send_mirror($buf);
                 # print received packed
-                if ($self->{DEBUG} > 0) {
-                    my ($port, $addr) = unpack_sockaddr_in($fromaddr);
-                    my $ipaddr = inet_ntoa($addr);
-                    # change hw addr format
-                    my $mac = $self->FormatMAC(substr($dhcpreq->chaddr(), 0, (2 * $dhcpreq->hlen())));
-                    $self->logger(1, "Got a packet src = $ipaddr:$port mac = $mac length = " . length($buf));
-                    $self->logger(2, $dhcpreq->toString());
-                }
-
+                $self->logger(2, $dhcpreq->toString());
                 $self->db_log_detailed($dhcpreq);
 
                 # handle packet
