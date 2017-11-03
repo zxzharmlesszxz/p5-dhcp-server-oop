@@ -247,13 +247,13 @@ package Server; {
                 next if ($dhcpreq->htype() != HTYPE_ETHER || $dhcpreq->hlen() != 6);
 
                 # bad DHCP message!
-                next if (defined($dhcpreq->getOptionRaw(DHO_DHCP_MESSAGE_TYPE())) == 0);
+                next if ($self->get_req_raw_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE()) eq '');
 
                 # Is message for us?
-                next if (defined($dhcpreq->getOptionRaw(DHO_DHCP_SERVER_IDENTIFIER())) && $dhcpreq->getOptionValue(DHO_DHCP_SERVER_IDENTIFIER()) ne $self->{DHCP_SERVER_ID});
+                next if ($self->check_for_me($dhcpreq));
 
                 # RRAS client, ignory them
-                next if (defined($dhcpreq->getOptionRaw(DHO_USER_CLASS())) && $dhcpreq->getOptionRaw(DHO_USER_CLASS()) eq "RRAS.Microsoft");
+                next if ($self->get_req_raw_param($dhcpreq, DHO_USER_CLASS()) eq "RRAS.Microsoft");
 
                 # send duplicate of received packet to mirror
                 $self->send_mirror($buf);
@@ -262,7 +262,7 @@ package Server; {
                 $self->db_log_detailed($dhcpreq);
 
                 # handle packet
-                my $type = $dhcpreq->getOptionValue(DHO_DHCP_MESSAGE_TYPE());
+                my $type = $self->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE());
                 if ($type == DHCPDISCOVER) {$self->handle_discover($fromaddr, $dhcpreq);}#-> DHCPOFFER
                 elsif ($type == DHCPREQUEST) {$self->handle_request($fromaddr, $dhcpreq);}#-> DHCPACK/DHCPNAK
                 elsif ($type == DHCPDECLINE) {$self->handle_decline($fromaddr, $dhcpreq);}
@@ -289,6 +289,8 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(0, "END code: " . $_[0]);
 
+        # need to fix exit tread
+
         Thread->exit($_[0]) if Thread->can('exit');
         exit($_[0]);
     }
@@ -301,8 +303,8 @@ package Server; {
         #my $dhcpresp = $_[2];
         my ($dhcpresppkt, $toaddr);
         # add last!!!!
-        if (defined($_[1]->getOptionRaw(DHO_DHCP_AGENT_OPTIONS()))) {$_[2]->addOptionRaw(DHO_DHCP_AGENT_OPTIONS(),
-            $_[1]->getOptionRaw(DHO_DHCP_AGENT_OPTIONS()));}
+        my $agent_opt = $self->get_req_raw_param($_[1], DHO_DHCP_AGENT_OPTIONS());
+        $_[2]->addOptionRaw(DHO_DHCP_AGENT_OPTIONS(), $agent_opt) if ($agent_opt ne '');
         $dhcpresppkt = $_[2]->serialize();
 
         if ($_[1]->giaddr() eq '0.0.0.0') {
@@ -312,7 +314,7 @@ package Server; {
             else {
                 if ($_[1]->ciaddr() eq '0.0.0.0') {
                     # ALL HERE NON RFC 2131 4.1 COMPLIANT!!!
-                    # perl can not send to hw addr unicaset with ip 0.0.0.0, and we send broadcast
+                    # perl can not send to hw addr unicast with ip 0.0.0.0, and we send broadcast
                     if ($_[1]->flags() == 0 || 1) {
                         # send unicast XXXXXXXXX - flags ignored!
                         # here we mast send unicast to hw addr, ip 0.0.0.0
@@ -330,9 +332,8 @@ package Server; {
                 else {$toaddr = sockaddr_in($self->{CLIENT_PORT}, $_[1]->ciaddrRaw());}
             }
         }
-        else {# send to relay
-            $toaddr = sockaddr_in($self->{SERVER_PORT}, $_[1]->giaddrRaw());
-        }
+        # send to relay
+        else {$toaddr = sockaddr_in($self->{SERVER_PORT}, $_[1]->giaddrRaw());}
         send($self->{SOCKET_RCV}, $dhcpresppkt, 0, $toaddr) || $self->logger(0, "send error: $!");
 
         my ($port, $addr) = unpack_sockaddr_in($toaddr);
@@ -368,8 +369,8 @@ package Server; {
 
     sub BuffToHEX($) {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         my $buf = shift;
+        $self->logger(3, "Function: " . (caller(0))[3]);
         $buf =~ s/(.)/sprintf("%02x", ord($1))/eg;
         return ($buf);
     }
@@ -453,10 +454,10 @@ package Server; {
 
     sub subnetBits {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         my $m = unpack("N", pack("C4", split(/\./, $_[0])));
         my $v = pack("L", $m);
         my $bcnt = 0;
+        $self->logger(3, "Function: " . (caller(0))[3]);
         foreach (0 .. 31) {$bcnt++ if (vec($v, $_, 1) == 1);}
         return ($bcnt);
     }
@@ -490,6 +491,13 @@ package Server; {
         $str .= pack('CCCC', split(/\./, $_[2]));
 
         return ($str);
+    }
+
+    sub check_for_me {
+        my ($self) = shift;
+        #my $dhcpreq = $_[0];
+        $self->logger(3, "Function: " . (caller(0))[3]);
+        return ($self->get_req_param($_[0], DHO_DHCP_SERVER_IDENTIFIER()) eq $self->{DHCP_SERVER_ID});
     }
 
     sub handle_discover {
@@ -527,8 +535,8 @@ package Server; {
         my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         my ($port, $addr) = unpack_sockaddr_in($_[0]);
         my $ipaddr = inet_ntoa($addr);
-        # change hw addr format
         my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
+        $self->db_check_requested_data($_[0], $_[1]);
 
         if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
@@ -558,6 +566,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
+        $self->db_check_requested_data($_[0], $_[1]);
         $self->db_lease_decline($_[1]);
     }
 
@@ -566,6 +575,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
+        $self->db_check_requested_data($_[0], $_[1]);
         $self->db_lease_release($_[1]);
     }
 
@@ -575,6 +585,7 @@ package Server; {
         $self->logger(2, "Got REQUEST send ACK");
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
+        $self->db_check_requested_data($_[0], $_[1]);
         my ($dhcpreqparams, $dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
