@@ -33,32 +33,32 @@ package Server; {
         my $class = shift;
 
         my $self = {
-            name                           => 'Net::DHCPD::Server',
-            version                        => '1.0',
-            BIND_ADDR                      => '0.0.0.0',
-            SERVER_PORT                    => '67',
-            CLIENT_PORT                    => '68',
-            DHCP_SERVER_ID                 => '',
-            MIRROR                         => undef,
-            DBDATASOURCE                   => 'mysql:dhcp:127.0.0.1',
-            DBLOGIN                        => 'dhcp',
-            DBPASS                         => 'dhcp',
-            THREADS_COUNT                  => 4,
-            PIDFILE                        => '/var/run/dhcpd.pid',
-            DEBUG                          => 0,
-            DAEMON                         => undef,
-            RUNNING                        => 0,
-            get_requested_data_client      => '',
-            get_requested_data_relay       => '',
-            get_requested_data_guest       => '',
-            get_requested_data_opt82       => '',
-            get_routing                    => '',
-            lease_offered                  => '',
-            lease_nak                      => '',
-            lease_decline                  => '',
-            lease_release                  => '',
-            lease_success                  => '',
-            log_detailed                   => ''
+            name                      => 'Net::DHCPD::Server',
+            version                   => '1.0',
+            BIND_ADDR                 => '0.0.0.0',
+            SERVER_PORT               => '67',
+            CLIENT_PORT               => '68',
+            DHCP_SERVER_ID            => '',
+            MIRROR                    => undef,
+            DBDATASOURCE              => 'mysql:dhcp:127.0.0.1',
+            DBLOGIN                   => 'dhcp',
+            DBPASS                    => 'dhcp',
+            THREADS_COUNT             => 4,
+            PIDFILE                   => '/var/run/dhcpd.pid',
+            DEBUG                     => 0,
+            DAEMON                    => undef,
+            RUNNING                   => 0,
+            get_requested_data_client => '',
+            get_requested_data_relay  => '',
+            get_requested_data_guest  => '',
+            get_requested_data_opt82  => '',
+            get_routing               => '',
+            lease_offered             => '',
+            lease_nak                 => '',
+            lease_decline             => '',
+            lease_release             => '',
+            lease_success             => '',
+            log_detailed              => ''
         };
 
         bless $self, $class;
@@ -253,7 +253,8 @@ package Server; {
                 next if (defined($dhcpreq->getOptionRaw(DHO_USER_CLASS())) && $dhcpreq->getOptionRaw(DHO_USER_CLASS()) eq "RRAS.Microsoft");
 
                 # send duplicate of received packet to mirror
-                if (defined($self->{ADDR_MIRROR})) {send($self->{SOCKET_RCV}, $buf, 0, $self->{ADDR_MIRROR}) || $self->logger("send mirr error: $!");}
+                if (defined($self->{ADDR_MIRROR})) {send($self->{SOCKET_RCV}, $buf, 0,
+                    $self->{ADDR_MIRROR}) || $self->logger("send mirr error: $!");}
 
                 # print received packed
                 if ($self->{DEBUG} > 0) {
@@ -511,6 +512,7 @@ package Server; {
     sub handle_discover {
         my ($self) = shift;
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+        $self->logger("Got DISCOVER send OFFER") if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $fromaddr  = $_[1];
         #my $dhcpreq = $_[2];
@@ -524,8 +526,7 @@ package Server; {
             $self->db_lease_offered($_[0], $_[2], $dhcpresp);
         }
         else {# if AUTO_CONFIGURE (116) supported - send disable generate link local addr
-            if (defined($_[2]->getOptionRaw(DHO_AUTO_CONFIGURE))
-                && $_[2]->getOptionValue(DHO_AUTO_CONFIGURE()) != 0) {
+            if (defined($_[2]->getOptionRaw(DHO_AUTO_CONFIGURE)) && $_[2]->getOptionValue(DHO_AUTO_CONFIGURE()) != 0) {
                 $dhcpresp->addOptionValue(DHO_AUTO_CONFIGURE(), 0);
                 $self->send_reply($_[1], $_[2], $dhcpresp);
             }
@@ -541,8 +542,11 @@ package Server; {
         my ($dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[2]);
 
-        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp, $_[1]) == 1 || $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 1) {
-            if ((defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) && $_[2]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || (defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) == 0 && $_[2]->ciaddr() ne $dhcpresp->yiaddr())) {
+        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp,
+            $_[1]) == 1 || $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 1) {
+            if ((defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) && $_[2]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
+                (defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) == 0 && $_[2]->ciaddr() ne $dhcpresp->yiaddr())) {
+                $self->logger("Got REQUEST send NACK") if ($self->{DEBUG} > 1);
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
                 $self->db_lease_nak($_[0], $_[2]);
                 # NAK if requested addr not equal IP addr in DB
@@ -550,6 +554,7 @@ package Server; {
                 $dhcpresp->yiaddr('0.0.0.0');
             }
             else {
+                $self->logger("Got REQUEST send ACK") if ($self->{DEBUG} > 1);
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
                 $self->db_lease_success($_[0], $_[2]);
             }
@@ -579,6 +584,7 @@ package Server; {
     sub handle_inform {
         my ($self) = shift;
         $self->logger("Function: " . (caller(0))[3]) if ($self->{DEBUG} > 1);
+        $self->logger("Got REQUEST send ACK") if ($self->{DEBUG} > 1);
         #my $dbh = $_[0];
         #my $fromaddr  = $_[1];
         #my $dhcpreq = $_[2];
@@ -683,8 +689,10 @@ package Server; {
             }
             else {
                 $self->logger("Got a packet from guest relay src = $ipaddr:$port");
-                if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
-                    $self->logger(sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
+                if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+                    $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
+                    $self->logger(sprintf("SQL: ($self->{get_requested_data_opt82}",
+                        $dhcp_opt82_vlan_id)) if ($self->{DEBUG} > 1);
                     $sth = $_[0]->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
                 }
             }
@@ -755,16 +763,12 @@ package Server; {
         # do not add routes if not requested
         return() if (defined($_[1]) == 0);
         $opt33Enbled = index($_[1], DHO_STATIC_ROUTES());
-        if ($opt33Enbled == - 1) {
-            $opt33Enbled = undef;
-        }
+        $opt33Enbled = undef if ($opt33Enbled == - 1);
 
         $optClasslessRoutesCode = index($_[1], 121);
         if ($optClasslessRoutesCode == - 1) {
             $optClasslessRoutesCode = index($_[1], 249); # MSFT
-            if ($optClasslessRoutesCode == - 1) {
-                $optClasslessRoutesCode = undef;
-            }
+            if ($optClasslessRoutesCode == - 1) {$optClasslessRoutesCode = undef;}
             else {
                 $opt33Enbled = undef;
                 $optClasslessRoutesCode = 249;
@@ -775,17 +779,13 @@ package Server; {
             $optClasslessRoutesCode = 121;
         }
 
-        if (defined($opt33Enbled) == 0 && defined($optClasslessRoutesCode) == 0) {
-            # nothink to do, return
-            return ();
-        }
+        return () if (defined($opt33Enbled) == 0 && defined($optClasslessRoutesCode) == 0);
 
         $sth = $_[0]->prepare(sprintf($self->{get_routing}, $_[2]));
         $self->logger(sprintf("SQL: $self->{get_routing}", $_[2])) if ($self->{DEBUG} > 1);
         $sth->execute();
         if ($sth->rows()) {
-            my $ref;
-            my $row;
+            my ($ref, $row);
             my $opt33_data = undef; # routes to single hosts
             my $opt_classless_routes_data = undef; # routes to nets
 
@@ -798,18 +798,13 @@ package Server; {
                     # pack gw
                     $opt33_data .= pack('CCCC', split(/\./, @$row[2]));
                 }
-                if (defined($optClasslessRoutesCode)) {
-                    $opt_classless_routes_data .= $self->mk_classless_routes_bin_mask(@$row[0], @$row[1], @$row[2]);
-                }
+                $opt_classless_routes_data .= $self->mk_classless_routes_bin_mask(@$row[0], @$row[1],
+                    @$row[2]) if (defined($optClasslessRoutesCode));
             }
 
-            if (defined($opt33_data)) {# add option
-                $_[3]->addOptionRaw(DHO_STATIC_ROUTES(), $opt33_data);
-            }
-
-            if (defined($opt_classless_routes_data)) {# add option
-                $_[3]->addOptionRaw($optClasslessRoutesCode, $opt_classless_routes_data);
-            }
+            $_[3]->addOptionRaw(DHO_STATIC_ROUTES(), $opt33_data) if (defined($opt33_data));
+            $_[3]->addOptionRaw($optClasslessRoutesCode,
+                $opt_classless_routes_data) if (defined($opt_classless_routes_data));
         }
         $sth->finish();
     }
@@ -862,7 +857,8 @@ package Server; {
         my ($client_ip, $gateway_ip, $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $client_ip = $_[1]->ciaddr();
         $gateway_ip = $_[1]->giaddr();
         #$client_ident = defined($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) ? $self->BuffToHEX($_[1]->getOptionRaw(DHO_DHCP_CLIENT_IDENTIFIER())) : '';
@@ -922,7 +918,8 @@ package Server; {
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
         my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
         my $hostname = $self->get_req_param($_[1], DHO_HOST_NAME());
@@ -948,7 +945,8 @@ package Server; {
         my ($client_ip, $gateway_ip, $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $client_ip = $_[1]->ciaddr();
         $gateway_ip = $_[1]->giaddr();
         $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()));
