@@ -536,7 +536,7 @@ package Server; {
         my ($port, $addr) = unpack_sockaddr_in($_[1]);
         my $ipaddr = inet_ntoa($addr);
         # change hw addr format
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
+        my $mac = $self->FormatMAC(substr($_[2]->chaddr(), 0, (2 * $_[2]->hlen())));
 
         if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
