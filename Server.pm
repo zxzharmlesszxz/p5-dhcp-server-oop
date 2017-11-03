@@ -219,7 +219,6 @@ package Server; {
             $SIG{KILL} = sub {
                 $self->logger(0, "END by sig handler");
                 $self->{dbh}->disconnect;
-                $self->stop();
                 $self->thread_exit(0);
             };
         }
