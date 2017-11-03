@@ -495,7 +495,9 @@ package Server; {
     sub handle_discover {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->logger(2, "Got DISCOVER send OFFER");
+        $self->logger(2, "Got DISCOVER from giaddr = " . $_[1]->giaddr() .
+                " for MAC = " . $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))) .
+                " and wont IP = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) . "send OFFER");
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
         my ($dhcpresp);
