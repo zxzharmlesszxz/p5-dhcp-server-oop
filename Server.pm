@@ -412,6 +412,7 @@ package Server; {
                 $self->logger(1, "RelayAgent Circuit ID: " . $RelayAgent[($i + 1)]);
                 next if (length($RelayAgent[($i + 1)]) < 4);
                 # first bytes must be: 00 04
+                # zte has 'eth 1/0/8:4096.444 0/0/0/0/0/0' (not packed string) /^(\w+)\s(\d+)\/(\d+)\/(\d+):(\d+)\.(\d+)\s(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/
                 #$_[1] = unpack('n', substr($RelayAgent[($i + 1)], -4, 2)); # may be 's'
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=\ )/;
                 $_[1] = $1;
