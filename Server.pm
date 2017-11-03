@@ -611,7 +611,7 @@ package Server; {
         my $yiaddr = $_[1]->yiaddr();
         my $ciaddr = $_[1]->ciaddr();
         my $giaddr = $_[1]->giaddr();
-        $self->logger(2, $dhcpreq->toString());
+        $self->logger(2, $_[1]->toString());
         $self->logger(3, "ipaddr = $ipaddr port = $port mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
         return;
     }
