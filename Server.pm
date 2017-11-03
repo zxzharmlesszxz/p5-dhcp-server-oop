@@ -868,7 +868,7 @@ package Server; {
 
         $self->logger(2, sprintf("SQL: $self->{lease_decline}", $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id)) if ($self->{DEBUG} > 1);
+            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth = $_[0]->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
