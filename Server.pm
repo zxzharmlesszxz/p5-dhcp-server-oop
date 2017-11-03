@@ -532,11 +532,16 @@ package Server; {
         #my $dbh = $_[0];
         #my $fromaddr  = $_[1];
         #my $dhcpreq = $_[2];
-        my ($dhcpresp);
-        $dhcpresp = $self->GenDHCPRespPkt($_[2]);
+        my $dhcpresp = $self->GenDHCPRespPkt($_[2]);
+        my ($port, $addr) = unpack_sockaddr_in($_[3]);
+        my $ipaddr = inet_ntoa($addr);
+        # change hw addr format
+        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
 
-        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp,
-            $_[1]) == 1 || $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 1) {
+        if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
+        else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
+
+        if ($self->db_get_requested_data_client($_[0], $_[2], $dhcpresp, $_[1]) == 1 || $self->db_get_requested_data_guest($_[0], $_[2], $dhcpresp, $_[1]) == 1) {
             if ((defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) && $_[2]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
                 (defined($_[2]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) == 0 && $_[2]->ciaddr() ne $dhcpresp->yiaddr())) {
                 $self->logger(2, "Got REQUEST send NACK");
