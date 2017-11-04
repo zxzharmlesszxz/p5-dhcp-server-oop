@@ -546,6 +546,11 @@ package Server; {
             $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
             $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
             $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
+            $self->logger(3, "Requested_ip != Yiaddr") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr());
+            $self->logger(3, "Requested_ip = ''") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '');
+            $self->logger(3, "Requested_ip = ''") if ($_[1]->ciaddr() ne $dhcpresp->yiaddr());
+            $self->logger(3, "Requested_ip = '' && Ciaddr != Yiaddr") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr());
+            $self->logger(3, "Requested_ip != Yiaddr || Requested_ip = '' && Ciaddr != Yiaddr") if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr()));
             if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
                 # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
