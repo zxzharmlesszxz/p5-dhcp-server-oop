@@ -824,8 +824,8 @@ package Server; {
         #my $dhcpresp = $_[1];
         my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         $self->logger(0, "yiaddr = ".$_[1]->yiaddr().", ciaddr = ".$_[1]->ciaddr());
-        $self->logger(2, sprintf("SQL: $self->{lease_offered}", $mac, $_[0]->yiaddr()));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_offered}, $mac, $_[0]->yiaddr()));
+        $self->logger(2, sprintf("SQL: $self->{lease_offered}", $mac, $_[1]->yiaddr()));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_offered}, $mac, $_[1]->yiaddr()));
         $sth->execute();
         $sth->finish();
 
