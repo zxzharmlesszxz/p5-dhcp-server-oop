@@ -515,8 +515,8 @@ package Server; {
         $self->db_check_requested_data($_[0], $_[1]);
 
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
-        if ($self->db_get_requested_data_client($_[1], $dhcpresp) == 1 ||
-            $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
+        if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 ||
+            $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
             $self->send_reply($_[0], $_[1], $dhcpresp);
             $self->db_lease_offered($_[1], $dhcpresp);
         }
@@ -600,6 +600,8 @@ package Server; {
         $self->send_reply($_[0], $_[1], $dhcpresp);
     }
 
+
+    # Need to delete fromaddr from db-functions
     sub db_check_requested_data {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
