@@ -543,6 +543,9 @@ package Server; {
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
 
         if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
+            $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
+            $self->logger(3, "Yiaddr = " . $_[1]->yiaddr());
+            $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
             if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
                 ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
                 $self->logger(2, "Got REQUEST send NACK");
