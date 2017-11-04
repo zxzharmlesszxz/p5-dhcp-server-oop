@@ -833,7 +833,7 @@ package Server; {
         my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         my $ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
         $self->logger(2, sprintf("SQL: $self->{lease_nak}", $mac, $ip));
-        my $sth = $self->{dbh}->prepare(sprintf("SQL: $self->{lease_nak}", $mac, $ip));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_nak}, $mac, $ip));
         $sth->execute();
         $sth->finish();
 
