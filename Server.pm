@@ -515,8 +515,8 @@ package Server; {
         $self->db_check_requested_data($_[0], $_[1]);
 
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
-        if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 ||
-            $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
+        if ($self->db_get_requested_data_client($_[1], $dhcpresp) == 1 ||
+            $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
             $self->send_reply($_[0], $_[1], $dhcpresp);
             $self->db_lease_offered($_[1], $dhcpresp);
         }
@@ -543,8 +543,8 @@ package Server; {
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
 
         if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
-            if ((defined($_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) && $_[1]->getOptionValue(DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
-                (defined($_[1]->getOptionRaw(DHO_DHCP_REQUESTED_ADDRESS())) == 0 && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+            if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
+                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
                 $self->logger(2, "Got REQUEST send NACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
                 $self->db_lease_nak($_[1]);
@@ -645,22 +645,20 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $dhcpreq = $_[0];
         #my $dhcpresp = $_[1];
-        my ($port, $addr) = unpack_sockaddr_in($_[2]);
-        my $ipaddr = inet_ntoa($addr);
         my ($mac, $sth, $dhcpreqparams, $result);
         # change hw addr format
         $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        $dhcpreqparams = $_[0]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
+        $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
         
-        if ($port == 68) {
-            $self->logger(2, "Got a packet from client src = $ipaddr:$port");
-            $self->logger(2, sprintf("SQL: $self->{get_requested_data_client}", $mac, $ipaddr));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_client}, $mac, $ipaddr));
+        if ($_[0]->giaddr() eq '0.0.0.0') {
+            $self->logger(2, "Got a packet from client src = " . $_[0]->ciaddr());
+            $self->logger(2, sprintf("SQL: $self->{get_requested_data_client}", $mac, $_[0]->ciaddr()));
+            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_client}, $mac, $_[0]->ciaddr()));
         }
         else {
-            $self->logger(2, "Got a packet from relay src = $ipaddr:$port");
-            $self->logger(2, sprintf("SQL: $self->{get_requested_data_relay}", $mac, $ipaddr));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_relay}, $mac, $ipaddr));
+            $self->logger(2, "Got a packet from relay src = " . $_[0]->giaddr());
+            $self->logger(2, sprintf("SQL: $self->{get_requested_data_relay}", $mac, $_[0]->giaddr()));
+            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_relay}, $mac, $_[0]->giaddr()));
         }
 
         $sth->execute();
@@ -685,22 +683,18 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $dhcpreq = $_[0];
         #my $dhcpresp = $_[1];
-        #my $fromaddr = $_[2];
-        my ($port, $addr) = unpack_sockaddr_in($_[2]);
-        my $ipaddr = inet_ntoa($addr);
         my ($mac, $sth, $dhcpreqparams, $result);
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        # change hw addr format
         $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        $dhcpreqparams = $_[0]->getOptionValue(DHO_DHCP_PARAMETER_REQUEST_LIST());
+        $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
         
-        if ($port == 68) {
-            $self->logger(2, "Got a packet from guest client src = $ipaddr:$port");
-            $self->logger(2, sprintf("SQL: $self->{get_requested_data_guest}", $mac, $ipaddr));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_guest}, $mac, $ipaddr));
+        if ($_[0]->giaddr() eq '0.0.0.0') {
+            $self->logger(2, "Got a packet from guest client src = " . $_[0]->ciaddr());
+            $self->logger(2, sprintf("SQL: $self->{get_requested_data_guest}", $mac, $_[0]->ciaddr()));
+            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_guest}, $mac, $_[0]->ciaddr()));
         }
         else {
-            $self->logger(2, "Got a packet from guest relay src = $ipaddr:$port");
+            $self->logger(2, "Got a packet from guest relay src = " . $_[0]->giaddr());
             if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
                 $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
                 $self->logger(2, sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id));
