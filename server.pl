@@ -11,14 +11,14 @@ my $get_requested_data_client = "SELECT * FROM `subnets`, `clients` WHERE `clien
 my $get_requested_data_relay = "SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '%s' LIMIT 1;";
 my $get_requested_data_guest = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` = '%s' LIMIT 1;";
 
-my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND `ips`.`lease_time` IS NULL AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1 ;";
+my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND (`ips`.`lease_time` IS NULL OR or `ips`.`lease_time` < UNIX_TIMESTAMP()) AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1 ;";
 
 my $get_routing = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;";
 my $lease_offered = "UPDATE `ips` SET `mac` = '%s', `lease_time` = UNIX_TIMESTAMP()+30 WHERE `ip` = '%s';";
 my $lease_nak = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `mac` ='%s' AND `ip` = '%s';";
 my $lease_decline = "INSERT INTO `dhcp_log` (`created`, `type`, `client_mac`,`client_ip`,`gateway_ip`,`client_ident`, `requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');";
 my $lease_release = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `mac` ='%s' AND `ip` = '%s';";
-my $lease_success = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='%s' WHERE `ip` = '%s';";
+my $lease_ack = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+3600, `mac` ='%s' WHERE `ip` = '%s';";
 my $log_detailed = "INSERT INTO `dhcp_log` (`created`,`type`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');";
 
 &start();
@@ -70,7 +70,7 @@ sub start {
     $server->set('lease_nak', $lease_nak);
     $server->set('lease_decline', $lease_decline);
     $server->set('lease_release', $lease_release);
-    $server->set('lease_success', $lease_success);
+    $server->set('lease_ack', $lease_ack);
     $server->set('log_detailed', $log_detailed);
 }
 
