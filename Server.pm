@@ -542,18 +542,17 @@ package Server; {
         if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
 
-        if ($self->db_get_requested_data_client($_[1], $dhcpresp, $_[0]) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp, $_[0]) == 1) {
+        if ($self->db_get_requested_data_client($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
             $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
             $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
             $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
-            if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
-                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+            if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+                # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-                $self->db_lease_nak($_[1]);
-                # NAK if requested addr not equal IP addr in DB
                 $dhcpresp->ciaddr('0.0.0.0');
                 $dhcpresp->yiaddr('0.0.0.0');
+                $self->db_lease_nak($_[1]);
             }
             else {
                 $self->logger(2, "Got REQUEST send ACK");
