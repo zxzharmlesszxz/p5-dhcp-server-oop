@@ -547,7 +547,7 @@ package Server; {
             $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
             $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
             if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) ||
-                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
                 $self->logger(2, "Got REQUEST send NACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
                 $self->db_lease_nak($_[1]);
