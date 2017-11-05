@@ -48,8 +48,7 @@ package Server; {
             DEBUG                     => 0,
             DAEMON                    => undef,
             RUNNING                   => 0,
-            get_requested_data_client => '',
-            get_requested_data_relay  => '',
+            get_requested_data        => '',
             get_requested_data_guest  => '',
             get_requested_data_opt82  => '',
             get_routing               => '',
@@ -518,7 +517,7 @@ package Server; {
         # ciaddr = 0
         # requested_addr = client ip
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
-        if ($self->db_get_requested_data_client($_[1], $dhcpresp) == 1 ||
+        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 ||
             $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
             $self->send_reply($_[0], $_[1], $dhcpresp);
             $self->db_lease_offered($dhcpresp);
@@ -548,7 +547,7 @@ package Server; {
         if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
 
-        if ($self->db_get_requested_data_client($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
+        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
             $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
             $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
             $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
@@ -611,7 +610,7 @@ package Server; {
 
         # ciaddr = client_ip
         # request_ip = 0
-        if ($self->db_get_requested_data_client($_[1], $dhcpresp) == 0) {
+        if ($self->db_get_requested_data($_[1], $dhcpresp) == 0) {
             $dhcpreqparams = $self->get_req_param($_[1], DHO_DHCP_PARAMETER_REQUEST_LIST());
             $self->static_data_to_reply($dhcpreqparams, $dhcpresp);
         }
@@ -659,27 +658,22 @@ package Server; {
         }
     }
 
-    sub db_get_requested_data_client {
+    sub db_get_requested_data {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $dhcpreq = $_[0];
         #my $dhcpresp = $_[1];
         my ($mac, $sth, $dhcpreqparams, $result);
-        # change hw addr format
         $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
-        
-        if ($_[0]->giaddr() eq '0.0.0.0') {
-            $self->logger(2, "Got a packet from client src = " . $_[0]->ciaddr());
-            $self->logger(2, sprintf("SQL: $self->{get_requested_data_client}", $mac, $_[0]->ciaddr()));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_client}, $mac, $_[0]->ciaddr()));
-        }
-        else {
-            $self->logger(2, "Got a packet from relay src = " . $_[0]->giaddr());
-            $self->logger(2, sprintf("SQL: $self->{get_requested_data_relay}", $mac, $_[0]->giaddr()));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_relay}, $mac, $_[0]->giaddr()));
-        }
+        # ciaddr = 0.0.0.0 if request and client_ip if bound/renew/rebind
+        # request_ip = client_ip if request and 0 if bound/renew/rebind
+        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
+        my $ip = ($_[0]->ciaddr() eq '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
 
+        $self->logger(2, "Got REQUEST from IP = " . $ip);
+        $self->logger(2, sprintf("SQL: $self->{get_requested_data}", $mac, $ip, $_[0]->giaddr()));
+        $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $mac, $ip, $_[0]->giaddr()));
         $sth->execute();
 
         if ($sth->rows()) {
