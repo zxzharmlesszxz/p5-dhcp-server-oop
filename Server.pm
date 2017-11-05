@@ -576,6 +576,13 @@ package Server; {
 
             $self->send_reply($_[0], $_[1], $dhcpresp);
         }
+        else {
+            $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
+            $dhcpresp->ciaddr('0.0.0.0');
+            $dhcpresp->yiaddr('0.0.0.0');
+            $self->db_lease_nak($_[1]);
+            $self->send_reply($_[0], $_[1], $dhcpresp);
+        }
     }
 
     sub handle_decline {
