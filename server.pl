@@ -7,8 +7,7 @@ use Server;
 my $server;
 my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID, $THREADS_COUNT, $DBDATASOURCE, $DBLOGIN, $DBPASS, $PIDFILE, $DEBUG, $DAEMON);
 
-my $get_requested_data_client = "SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `clients`.`ip` = '%s' LIMIT 1;";
-my $get_requested_data_relay = "SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '%s' LIMIT 1;";
+my $get_requested_data = "SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND (`clients`.`ip` = '%s' OR `subnets`.`gateway` = '%s') LIMIT 1;"; #done
 my $get_requested_data_guest = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` = '%s' LIMIT 1;";
 
 my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND (`ips`.`lease_time` IS NULL OR or `ips`.`lease_time` < UNIX_TIMESTAMP()) AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1 ;";
@@ -61,8 +60,7 @@ sub start {
     $server->set('THREADS_COUNT', $THREADS_COUNT);
     $server->set('PIDFILE', $PIDFILE);
     $server->set('DAEMON', $DAEMON);
-    $server->set('get_requested_data_client', $get_requested_data_client);
-    $server->set('get_requested_data_relay', $get_requested_data_relay);
+    $server->set('get_requested_data', $get_requested_data);
     $server->set('get_requested_data_guest', $get_requested_data_guest);
     $server->set('get_requested_data_opt82', $get_requested_data_opt82);
     $server->set('get_routing', $get_routing);
