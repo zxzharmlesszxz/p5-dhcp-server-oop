@@ -1138,7 +1138,7 @@ package Server; {
         # my ($mac) = $_[2];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to update lease time for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';", $_[0] $_[1], $_[2]));
+        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1], $_[2]));
         my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1], $_[2]));
         $sth->execute();
         $sth->finish();
