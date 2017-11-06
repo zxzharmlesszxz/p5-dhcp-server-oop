@@ -70,55 +70,49 @@ package Server; {
         # my ($self) = $_[0];
         # my ($param) = $_[1];
         # my ($value) = $[2];
-        my ($self) = $_[0];
-        $self->logger(3, "Function: " . (caller(0))[3]);
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
         if ($_[2] && $_[2] ne '') {
-            $self->logger(1, "Set: $_[1] = '$_[2]'");
-            $self->{$_[1]} = $_[2];
+            $_[0]->logger(1, "Set: $_[1] = '$_[2]'");
+            $_[0]->{$_[1]} = $_[2];
         }
     } #done
 
     sub signal_handler {
         # my ($self) = $_[0];
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->set('RUNNING', 0);
-        $self->stop();
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[0]->set('RUNNING', 0);
+        $_[0]->stop();
         $_->kill('KILL')->detach() foreach Thread->list();
     } #done +-
 
     sub start {
         # my ($self) = $_[0];
-        my ($self) = shift;
 
-        if (!defined($self->{DHCP_SERVER_ID})) {
-            $self->logger(0, "DHCP_SERVER_ID: must be real ip!");
+        if (!defined($_[0]->{DHCP_SERVER_ID})) {
+            $_[0]->logger(0, "DHCP_SERVER_ID: must be real ip!");
             exit;
         }
 
-        $self->logger(0,
-            "BIND_ADDR: $self->{BIND_ADDR}, THREADS_COUNT: $self->{THREADS_COUNT}, PIDFILE: $self->{PIDFILE}");
-        $self->daemon() if (defined($self->{DAEMON}));
-        $self->{RUNNING} = 1;
-        $self->run();
+        $_[0]->logger(0, "BIND_ADDR: $_[0]->{BIND_ADDR}, THREADS_COUNT: $_[0]->{THREADS_COUNT}, PIDFILE: $_[0]->{PIDFILE}");
+        $_[0]->daemon() if (defined($_[0]->{DAEMON}));
+        $_[0]->{RUNNING} = 1;
+        $_[0]->run();
     } #done
 
     sub stop {
         # my ($self) = $_[0];
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->{RUNNING} = 0;
-        close($self->{SOCKET_RCV});
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[0]->{RUNNING} = 0;
+        close($_[0]->{SOCKET_RCV});
     } #done
 
     sub logger {
         # my ($self) = $_[0];
         # my ($level) = $_[1];
         # my ($message) = $_[2];
-        my ($self) = $_[0];
         my ($tid) = Thread->tid();
-        syslog('info|local0', "Thread $tid: $_[2]") if ($self->{DEBUG} >= $_[1]);
-        if ($self->{DEBUG} == 0) {return;}
+        syslog('info|local0', "Thread $tid: $_[2]") if ($_[0]->{DEBUG} >= $_[1]);
+        if ($_[0]->{DEBUG} == 0) {return;}
 
         print STDOUT strftime "[%d/%b/%Y %H:%M:%S] ", localtime;
         print STDOUT "Thread $tid: $_[2]\n";
@@ -126,8 +120,7 @@ package Server; {
 
     sub daemon {
         # my ($self) = $_[0];
-        my ($self) = $_[0];
-        $self->logger(3, "Function: " . (caller(0))[3]);
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
         delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
         #POSIX::setuid(65534) or die "Can't set uid: $!\n"; # nobody
         POSIX::setsid or die "Can't start a new session: $!\n";
@@ -140,82 +133,82 @@ package Server; {
         open(STDOUT, "+>&STDIN") or die "Can't open STDOUT: $!\n";
         open(STDERR, "+>&STDIN") or die "Can't open STDERR: $!\n";
 
-        $self->logger(0, "Daemon mode");
+        $_[0]->logger(0, "Daemon mode");
     } #done
 
     sub write_pid {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        if (defined($self->{PIDFILE})) {
-            open FILE, "> $self->{PIDFILE}" || $self->logger(0, "PID file save error: $!");
+        # my ($self) = $_[0];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        if (defined($_[0]->{PIDFILE})) {
+            open FILE, "> $_[0]->{PIDFILE}" || $_[0]->logger(0, "PID file save error: $!");
             print FILE "$$\n";
             close FILE;
         }
     } #done
 
     sub add_mirror {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        if (defined($self->{MIRROR})) {
-            $self->{ADDR_MIRROR} = sockaddr_in($self->{SERVER_PORT}, inet_aton($self->{MIRROR}));
+        # my ($self) = $_[0];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        if (defined($_[0]->{MIRROR})) {
+            $_[0]->{ADDR_MIRROR} = sockaddr_in($_[0]->{SERVER_PORT}, inet_aton($_[0]->{MIRROR}));
         }
     } #done
 
     sub send_mirror {
-        my ($self) = shift;
-        # my $dhcpresppkt = $_[0]
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        send($self->{SOCKET_RCV}, $_[0], 0, $self->{ADDR_MIRROR}) ||
-            $self->logger(1, "send mirr error: $!") if (defined($self->{ADDR_MIRROR}));
+        # my ($self) = $_[0];
+        # my $dhcpresppkt = $_[1]
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        send($_[0]->{SOCKET_RCV}, $_[1], 0, $_[0]->{ADDR_MIRROR}) ||
+            $_[0]->logger(1, "send mirr error: $!") if (defined($_[0]->{ADDR_MIRROR}));
     } #done
 
     sub open_socket {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        socket($self->{SOCKET_RCV}, PF_INET, SOCK_DGRAM, getprotobyname('udp')) || die "Socket creation error: $@\n";
-        bind($self->{SOCKET_RCV}, sockaddr_in($self->{SERVER_PORT}, inet_aton($self->{BIND_ADDR}))) || die "bind: $!";
+        # my ($self) = $_[0];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        socket($_[0]->{SOCKET_RCV}, PF_INET, SOCK_DGRAM, getprotobyname('udp')) || die "Socket creation error: $@\n";
+        bind($_[0]->{SOCKET_RCV}, sockaddr_in($_[0]->{SERVER_PORT}, inet_aton($_[0]->{BIND_ADDR}))) || die "bind: $!";
     } #done
 
     sub run {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
+        # my ($self) = $_[0];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
         # write PID to file
-        $self->write_pid();
+        $_[0]->write_pid();
         # broadcast address
-        $self->{ADDR_BCAST} = sockaddr_in($self->{CLIENT_PORT}, INADDR_BROADCAST);
-        $self->add_mirror();
+        $_[0]->{ADDR_BCAST} = sockaddr_in($_[0]->{CLIENT_PORT}, INADDR_BROADCAST);
+        $_[0]->add_mirror();
         # open listening socket
-        $self->open_socket();
+        $_[0]->open_socket();
         # start threads
-        for (1 .. ($self->{THREADS_COUNT} - 1)) {Thread->new({ 'context' => 'void' }, sub {$self->request_loop()});}
-        $self->request_loop();
+        for (1 .. ($_[0]->{THREADS_COUNT} - 1)) {Thread->new({ 'context' => 'void' }, sub {$_[0]->request_loop()});}
+        $_[0]->request_loop();
         # delete PID file on exit
-        if (defined($self->{PIDFILE})) {unlink($self->{PIDFILE});}
-        $self->logger(0, "Main: END!");
+        if (defined($_[0]->{PIDFILE})) {unlink($_[0]->{PIDFILE});}
+        $_[0]->logger(0, "Main: END!");
     } #done +-
 
     sub request_loop {
-        my ($self) = shift;
+        # my ($self) = $_[0];
         my ($buf, $fromaddr, $dhcpreq); # recv data
         my ($t0, $t1, $td); # perfomance data
         my $tid = Thread->tid(); # thread ID
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->logger(0, "START");
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[0]->logger(0, "START");
         # each thread make its own connection to DB
         # connect($data_source, $username, $password, \%attr)
         # dbi:DriverName:database=database_name;host=hostname;port=port
-        until ($self->{dbh} = DBI->connect("DBI:" . $self->{DBDATASOURCE}, $self->{DBLOGIN}, $self->{DBPASS})) {
-            $self->logger(0, "Could not connect to database: $DBI::errstr");
-            $self->logger(0, "Sleeping 10 sec to retry");
+        until ($_[0]->{dbh} = DBI->connect("DBI:" . $_[0]->{DBDATASOURCE}, $_[0]->{DBLOGIN}, $_[0]->{DBPASS})) {
+            $_[0]->logger(0, "Could not connect to database: $DBI::errstr");
+            $_[0]->logger(0, "Sleeping 10 sec to retry");
             sleep(10);
         }
 
-        if (defined($self->{dbh}) == 0) {
-            $self->logger(0, "Could not connect to database: $DBI::errstr");
-            $self->thread_exit(1);
+        if (defined($_[0]->{dbh}) == 0) {
+            $_[0]->logger(0, "Could not connect to database: $DBI::errstr");
+            $_[0]->thread_exit(1);
         }
 
-        $self->{dbh}->{mysql_auto_reconnect} = 1;
+        $_[0]->{dbh}->{mysql_auto_reconnect} = 1;
 
         if ($tid != 0) {
             # disable signals receiving on creted threads and set handler for KILL signal
@@ -224,26 +217,26 @@ package Server; {
             unless (defined sigprocmask(SIG_BLOCK, $sigset, $old_sigset)) {die "Could not unblock SIGINT\n";}
 
             $SIG{KILL} = sub {
-                $self->logger(0, "END by sig handler");
-                $self->{dbh}->disconnect;
-                $self->thread_exit(0);
+                $_[0]->logger(0, "END by sig handler");
+                $_[0]->{dbh}->disconnect;
+                $_[0]->thread_exit(0);
             };
         }
 
-        while ($self->{RUNNING} == 1) {
+        while ($_[0]->{RUNNING} == 1) {
             $buf = undef;
 
             eval {
                 # catch fatal errors
                 # receive packet
-                $fromaddr = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger(0, "recv err: $!");
+                $fromaddr = recv($_[0]->{SOCKET_RCV}, $buf, 16384, 0) || $_[0]->logger(0, "recv err: $!");
 
                 next if ($!); # continue loop if an error occured
 
                 # filter to small packets
                 next if (length($buf) < 236); # 300
 
-                if ($self->{DEBUG} > 0) {$t0 = Benchmark->new;}
+                if ($_[0]->{DEBUG} > 0) {$t0 = Benchmark->new;}
 
                 # parce data to dhcp structes
                 $dhcpreq = Net::DHCP::Packet->new($buf);
@@ -253,134 +246,137 @@ package Server; {
                 next if ($dhcpreq->htype() != HTYPE_ETHER || $dhcpreq->hlen() != 6);
 
                 # bad DHCP message!
-                next if ($self->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE()) eq '');
+                next if ($_[0]->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE()) eq '');
 
                 # Is message for us?
-                next if ($self->check_for_me($dhcpreq));
+                next if ($_[0]->check_for_me($dhcpreq));
 
                 # RRAS client, ignory them
-                next if ($self->get_req_raw_param($dhcpreq, DHO_USER_CLASS()) eq "RRAS.Microsoft");
+                next if ($_[0]->get_req_raw_param($dhcpreq, DHO_USER_CLASS()) eq "RRAS.Microsoft");
 
                 # send duplicate of received packet to mirror
-                $self->send_mirror($buf);
+                $_[0]->send_mirror($buf);
                 # log all to db
-                $self->db_log_detailed($dhcpreq);
+                $_[0]->db_log_detailed($dhcpreq);
 
                 # handle packet
-                my $type = $self->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE());
-                if ($type == DHCPDISCOVER) {$self->handle_discover($fromaddr, $dhcpreq);}#-> DHCPOFFER
-                elsif ($type == DHCPREQUEST) {$self->handle_request($fromaddr, $dhcpreq);}#-> DHCPACK/DHCPNAK
-                elsif ($type == DHCPDECLINE) {$self->handle_decline($fromaddr, $dhcpreq);}
-                elsif ($type == DHCPRELEASE) {$self->handle_release($fromaddr, $dhcpreq);}
-                elsif ($type == DHCPINFORM) {$self->handle_inform($fromaddr, $dhcpreq);}#-> DHCPACK
+                my $type = $_[0]->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE());
+                if ($type == DHCPDISCOVER) {$_[0]->handle_discover($fromaddr, $dhcpreq);}#-> DHCPOFFER
+                elsif ($type == DHCPREQUEST) {$_[0]->handle_request($fromaddr, $dhcpreq);}#-> DHCPACK/DHCPNAK
+                elsif ($type == DHCPDECLINE) {$_[0]->handle_decline($fromaddr, $dhcpreq);}
+                elsif ($type == DHCPRELEASE) {$_[0]->handle_release($fromaddr, $dhcpreq);}
+                elsif ($type == DHCPINFORM) {$_[0]->handle_inform($fromaddr, $dhcpreq);}#-> DHCPACK
                 else {}
 
-                if ($self->{DEBUG} > 0) {
+                if ($_[0]->{DEBUG} > 0) {
                     $t1 = Benchmark->new;
                     $td = timediff($t1, $t0);
-                    $self->logger(2, "The code took: " . timestr($td));
+                    $_[0]->logger(2, "The code took: " . timestr($td));
                 }
             }; # end of 'eval' blocks
-            $self->logger(0, "Caught error in main loop: $@") if ($@);
+            $_[0]->logger(0, "Caught error in main loop: $@") if ($@);
         }
 
-        $self->{dbh}->disconnect;
+        $_[0]->{dbh}->disconnect;
 
-        $self->thread_exit(0);
+        $_[0]->thread_exit(0);
     } #done +-
 
     sub thread_exit($) {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->logger(0, "END code: " . $_[0]);
+        # my ($self) = $_[0];
+        # my ($code) = $_[1];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[0]->logger(0, "END code: " . $_[1]);
 
         # need to fix exit tread
 
-        Thread->exit($_[0]) if Thread->can('exit');
-        exit($_[0]);
+        Thread->exit($_[1]) if Thread->can('exit');
+        exit($_[1]);
     } #done +-
 
     sub send_reply {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $fromaddr = $_[0];
-        #my $dhcpreq = $_[1];
-        #my $dhcpresp = $_[2];
+        # my ($self) = $_[0];
+        #my $fromaddr = $_[1];
+        #my $dhcpreq = $_[2];
+        #my $dhcpresp = $_[3];
         my ($dhcpresppkt, $toaddr);
         # add last!!!!
-        my $agent_opt = $self->get_req_raw_param($_[1], DHO_DHCP_AGENT_OPTIONS());
-        $_[2]->addOptionRaw(DHO_DHCP_AGENT_OPTIONS(), $agent_opt) if ($agent_opt ne '');
-        $dhcpresppkt = $_[2]->serialize();
+        my $agent_opt = $_[0]->get_req_raw_param($_[2], DHO_DHCP_AGENT_OPTIONS());
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[3]->addOptionRaw(DHO_DHCP_AGENT_OPTIONS(), $agent_opt) if ($agent_opt ne '');
+        $dhcpresppkt = $_[3]->serialize();
 
-        if ($_[1]->giaddr() eq '0.0.0.0') {
+        if ($_[2]->giaddr() eq '0.0.0.0') {
             # client local, not relayed
             # always broadcast DHCPNAK
-            if ($_[2]->DHO_DHCP_MESSAGE_TYPE() == DHCPNAK) {$toaddr = $self->{ADDR_BCAST};}
+            if ($_[3]->DHO_DHCP_MESSAGE_TYPE() == DHCPNAK) {$toaddr = $_[0]->{ADDR_BCAST};}
             else {
-                if ($_[1]->ciaddr() eq '0.0.0.0') {
+                if ($_[2]->ciaddr() eq '0.0.0.0') {
                     # ALL HERE NON RFC 2131 4.1 COMPLIANT!!!
                     # perl can not send to hw addr unicast with ip 0.0.0.0, and we send broadcast
-                    if ($_[1]->flags() == 0 || 1) {
+                    if ($_[2]->flags() == 0 || 1) {
                         # send unicast XXXXXXXXX - flags ignored!
                         # here we mast send unicast to hw addr, ip 0.0.0.0
-                        my ($port, $addr) = unpack_sockaddr_in($_[0]);
+                        my ($port, $addr) = unpack_sockaddr_in($_[1]);
                         my $ipaddr = inet_ntoa($addr);
 
-                        if ($ipaddr eq '0.0.0.0') {$toaddr = $self->{ADDR_BCAST};}
+                        if ($ipaddr eq '0.0.0.0') {$toaddr = $_[0]->{ADDR_BCAST};}
                         # giaddr and ciaddr is zero but we know ip addr from received packet
-                        else {$toaddr = sockaddr_in($self->{CLIENT_PORT}, $addr);}
+                        else {$toaddr = sockaddr_in($_[0]->{CLIENT_PORT}, $addr);}
                     }
                     # only this comliant to rfc 2131 4.1
-                    else {$toaddr = $self->{ADDR_BCAST};}
+                    else {$toaddr = $_[0]->{ADDR_BCAST};}
                 }
                 # client have IP addr, send unicast
-                else {$toaddr = sockaddr_in($self->{CLIENT_PORT}, $_[1]->ciaddrRaw());}
+                else {$toaddr = sockaddr_in($_[0]->{CLIENT_PORT}, $_[2]->ciaddrRaw());}
             }
         }
         # send to relay
-        else {$toaddr = sockaddr_in($self->{SERVER_PORT}, $_[1]->giaddrRaw());}
-        send($self->{SOCKET_RCV}, $dhcpresppkt, 0, $toaddr) || $self->logger(0, "send error: $!");
+        else {$toaddr = sockaddr_in($_[0]->{SERVER_PORT}, $_[2]->giaddrRaw());}
+        send($_[0]->{SOCKET_RCV}, $dhcpresppkt, 0, $toaddr) || $_[0]->logger(0, "send error: $!");
 
         my ($port, $addr) = unpack_sockaddr_in($toaddr);
         my $ipaddr = inet_ntoa($addr);
-        $self->logger(1, "Sending response to = $ipaddr:$port length = " . length($dhcpresppkt));
+        $_[0]->logger(1, "Sending response to = $ipaddr:$port length = " . length($dhcpresppkt));
         # send copy of packet to mirror, if specified
-        $self->send_mirror($dhcpresppkt);
+        $_[0]->send_mirror($dhcpresppkt);
     } #done
 
     sub GenDHCPRespPkt {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $dhcpreq = $_[0];
+        # my ($self) = $_[0];
+        #my $dhcpreq = $_[1];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
 
         my $dhcpresp = Net::DHCP::Packet->new(
             Op                           => BOOTREPLY(),
-            Htype                        => $_[0]->htype(), #rfc2131 - From "Assigned Numbers" RFC
-            Hlen                         => $_[0]->hlen(), #rfc2131 - must be 6 ipv4
-            # Hops                       => $_[0]->hops(),   #rfc2131 - must be 0
-            Xid                          => $_[0]->xid(), #rfc2131 - must be from client DISCOVER
-            Secs                         => $_[0]->secs(), #rfc2131 - must be 0
-            Flags                        => $_[0]->flags(), #rfc2131 - must be from client DISCOVER
-            #Ciaddr                      => $_[0]->ciaddr(), #rfc2131 - must be 0
+            Htype                        => $_[1]->htype(), #rfc2131 - From "Assigned Numbers" RFC
+            Hlen                         => $_[1]->hlen(), #rfc2131 - must be 6 ipv4
+            # Hops                       => $_[1]->hops(),   #rfc2131 - must be 0
+            Xid                          => $_[1]->xid(), #rfc2131 - must be from client DISCOVER
+            Secs                         => $_[1]->secs(), #rfc2131 - must be 0
+            Flags                        => $_[1]->flags(), #rfc2131 - must be from client DISCOVER
+            #Ciaddr                      => $_[1]->ciaddr(), #rfc2131 - must be 0
             #Yiaddr                      => '0.0.0.0',       #rfc2131 - must be from IP for client DISCOVER(will be setted at the next step)
-            Siaddr                       => $_[0]->siaddr(), #rfc2131 - must be from client DISCOVER if relayed
-            Giaddr                       => $_[0]->giaddr(), #rfc2131 - must be from client DISCOVER
-            Chaddr                       => $_[0]->chaddr(), #rfc2131 - must be from client DISCOVER
+            Siaddr                       => $_[1]->siaddr(), #rfc2131 - must be from client DISCOVER if relayed
+            Giaddr                       => $_[1]->giaddr(), #rfc2131 - must be from client DISCOVER
+            Chaddr                       => $_[1]->chaddr(), #rfc2131 - must be from client DISCOVER
             DHO_DHCP_MESSAGE_TYPE()      => DHCPACK, # must be owerwritten
-            DHO_DHCP_SERVER_IDENTIFIER() => $self->{DHCP_SERVER_ID}
+            DHO_DHCP_SERVER_IDENTIFIER() => $_[0]->{DHCP_SERVER_ID}
         );
         return ($dhcpresp);
     } #done
 
     sub BuffToHEX($) {
-        my ($self) = shift;
-        my $buf = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $buf =~ s/(.)/sprintf("%02x", ord($1))/eg;
-        return ($buf);
+        # my ($self) = $_[0];
+        # my ($buf) = $_[1];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[1] =~ s/(.)/sprintf("%02x", ord($1))/eg;
+        return ($_[1]);
     } #done
 
     sub unpackRelayAgent(%) {
+        # my ($self) = $_[0];
+        # my (@SubOptions) = @_;
         my ($self) = shift;
         my @SubOptions = @_;
         my $buf;
@@ -452,58 +448,57 @@ package Server; {
     } #done +-(need to move this function to server.pl)
 
     sub FormatMAC {
-        my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $_[0] =~ /([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})/i;
+        # my ($self) = $_[0];
+        # my ($mac) = $_[1];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        $_[1] =~ /([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})/i;
         return (lc(join(':', $1, $2, $3, $4, $5, $6)));
     } #done
 
     sub subnetBits {
-        my ($self) = shift;
-        my $m = unpack("N", pack("C4", split(/\./, $_[0])));
-        my $v = pack("L", $m);
+        # my ($self) = $_[0];
+        # my ($bits) = $_[1];
         my $bcnt = 0;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        foreach (0 .. 31) {$bcnt++ if (vec($v, $_, 1) == 1);}
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        foreach (0 .. 31) {$bcnt++ if (vec(pack("L", unpack("N", pack("C4", split(/\./, $_[1])))), $_, 1) == 1);}
         return ($bcnt);
     } #done
 
     sub mk_classless_routes_bin_mask {
-        my ($self) = shift;
-        #my $net = $_[0];
-        #my $mask = $_[1];
-        #my $gw = $_[2];
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        return ($self->mk_classless_routes_bin_prefixlen($_[0], $self->subnetBits($_[1]), $_[2]));
+        # my ($self) = $_[0];
+        #my $net = $_[1];
+        #my $mask = $_[2];
+        #my $gw = $_[3];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        return ($_[0]->mk_classless_routes_bin_prefixlen($_[1], $_[0]->subnetBits($_[2]), $_[3]));
     } #done
 
     sub mk_classless_routes_bin_prefixlen {
-        my ($self) = shift;
-        #my $net = $_[0];
-        #my $prefixlen = $_[1];
-        #my $gw = $_[2];
-        my $str;
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        $str = pack('C', $_[1]);
+        # my ($self) = $_[0];
+        #my $net = $_[1];
+        #my $prefixlen = $_[2];
+        #my $gw = $_[3];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        my ($str) = pack('C', $_[2]);
 
-        if ($_[1] > 0) {
-            my ($s1, $s2, $s3, $s4) = split(/\./, $_[0]);
+        if ($_[2] > 0) {
+            my ($s1, $s2, $s3, $s4) = split(/\./, $_[1]);
             $str .= pack('C', $s1);
-            $str .= pack('C', $s2) if ($_[1] > 8);
-            $str .= pack('C', $s3) if ($_[1] > 16);
-            $str .= pack('C', $s4) if ($_[1] > 24);
+            $str .= pack('C', $s2) if ($_[2] > 8);
+            $str .= pack('C', $s3) if ($_[2] > 16);
+            $str .= pack('C', $s4) if ($_[2] > 24);
         }
 
-        $str .= pack('CCCC', split(/\./, $_[2]));
+        $str .= pack('CCCC', split(/\./, $_[3]));
 
         return ($str);
     } #done
 
     sub check_for_me {
-        my ($self) = shift;
-        #my $dhcpreq = $_[0];
-        $self->logger(3, "Function: " . (caller(0))[3]);
-        return ($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()) eq $self->{DHCP_SERVER_ID}) ? 1 : 0;
+        # my ($self) = $_[0];
+        #my $dhcpreq = $_[1];
+        $_[0]->logger(3, "Function: " . (caller(0))[3]);
+        return ($_[0]->get_req_raw_param($_[1], DHO_DHCP_CLIENT_IDENTIFIER()) eq $_[0]->{DHCP_SERVER_ID}) ? 1 : 0;
     } #done
 
     # handlers
