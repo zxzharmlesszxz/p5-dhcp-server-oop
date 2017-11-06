@@ -91,7 +91,7 @@ package Server; {
         # my ($self) = shift;
         my ($self) = shift;
 
-        if (!defined($_[0]->{DHCP_SERVER_ID})) {
+        if (!defined($self->{DHCP_SERVER_ID})) {
             $self->logger(0, "DHCP_SERVER_ID: must be real ip!");
             exit;
         }
