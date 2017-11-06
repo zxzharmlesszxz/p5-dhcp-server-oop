@@ -618,7 +618,7 @@ package Server; {
             else {
                 $self->logger(2, "Got REQUEST send ACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
-                $self->lease_ack($_[1]->yiaddr(), $mac, $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
+                $self->lease_ack($dhcpresp->yiaddr(), $mac, $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
             }
 
             $self->send_reply($_[0], $_[1], $dhcpresp);
