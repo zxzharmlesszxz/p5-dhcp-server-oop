@@ -642,7 +642,7 @@ package Server; {
         # my ($dhcpreq) = $_[0];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->db_check_requested_data($_[1]);
+        $self->db_check_requested_data($_[0]);
         $self->lease_release($_[0]->ciaddr(), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))));
     } #done
 
