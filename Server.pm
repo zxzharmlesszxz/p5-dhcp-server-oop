@@ -1024,6 +1024,16 @@ package Server; {
         return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionRaw($_[1]) : '';
     } #done
 
+    sub add_lease {
+        # my ($self) = shift;
+        # my ($ip) = $_[0];
+        # my ($mac) = $_[1];
+        my ($self) = shift;
+        $self->logger(3, "Function: " . (caller(0))[3]);
+        $self->logger(3, sprintf("LEASE: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
+        return $self->db_add_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]) == 0);
+    } #done
+
     sub get_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
@@ -1156,6 +1166,21 @@ package Server; {
         $sth->execute();
         $sth->finish();
         $self->logger(3, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[1], $_[2]), $_[1], $_[2]));
+        return (1);
+    } #done
+
+    sub db_add_lease {
+        # my ($self) = shift;
+        # my ($lease_time) = $_[0];
+        # my ($ip) = $_[1];
+        # my ($mac) = $_[2];
+        my ($self) = shift;
+        $self->logger(3, sprintf("SQL: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d, `mac` = '%s' WHERE `ip` = '%s';", $_[0], $_[2], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d, `mac` = '%s' WHERE `ip` = '%s';", $_[0], $_[2], $_[1]));
+        $sth->execute();
+        $sth->finish();
+        $self->logger(3, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[1], $_[2]), $_[1], $_[2]));
         return (1);
     } #done
 }
