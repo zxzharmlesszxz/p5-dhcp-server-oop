@@ -33,60 +33,62 @@ package Server; {
         my $class = shift;
 
         my $self = {
-            name                      => 'Net::DHCPD::Server',
-            version                   => '1.0',
-            BIND_ADDR                 => '0.0.0.0',
-            SERVER_PORT               => '67',
-            CLIENT_PORT               => '68',
-            DHCP_SERVER_ID            => '',
-            MIRROR                    => undef,
-            DBDATASOURCE              => 'mysql:dhcp:127.0.0.1',
-            DBLOGIN                   => 'dhcp',
-            DBPASS                    => 'dhcp',
-            THREADS_COUNT             => 4,
-            PIDFILE                   => '/var/run/dhcpd.pid',
-            DEBUG                     => 0,
-            DAEMON                    => undef,
-            RUNNING                   => 0,
-            get_requested_data        => '',
-            get_requested_data_guest  => '',
-            get_requested_data_opt82  => '',
-            get_routing               => '',
-            lease_offered             => '',
-            lease_nak                 => '',
-            lease_decline             => '',
-            lease_release             => '',
-            lease_ack                 => '',
-            log_detailed              => '',
-            dbh                       => undef
+            name                     => 'Net::DHCPD::Server',
+            version                  => '1.0',
+            BIND_ADDR                => '0.0.0.0',
+            SERVER_PORT              => '67',
+            CLIENT_PORT              => '68',
+            DHCP_SERVER_ID           => '',
+            MIRROR                   => undef,
+            DBDATASOURCE             => 'mysql:dhcp:127.0.0.1',
+            DBLOGIN                  => 'dhcp',
+            DBPASS                   => 'dhcp',
+            THREADS_COUNT            => 4,
+            PIDFILE                  => '/var/run/dhcpd.pid',
+            DEBUG                    => 0,
+            DAEMON                   => undef,
+            RUNNING                  => 0,
+            get_requested_data       => '',
+            get_requested_data_guest => '',
+            get_requested_data_opt82 => '',
+            get_routing              => '',
+            lease_offered            => '',
+            lease_nak                => '',
+            lease_decline            => '',
+            lease_release            => '',
+            lease_ack                => '',
+            log_detailed             => '',
+            dbh                      => undef
         };
 
         bless $self, $class;
 
         return $self;
-    }
+    } #done +-
 
     sub set {
-        my ($self) = shift;
+        # my ($self) = $_[0];
+        # my ($param) = $_[1];
+        # my ($value) = $[2];
+        my ($self) = $_[0];
         $self->logger(3, "Function: " . (caller(0))[3]);
-        my ($param, $value);
-        $param = shift;
-        $value = shift;
-        if ($value && $value ne '') {
-            $self->logger(1, "Set: $param = '$value'");
-            $self->{$param} = $value;
+        if ($_[2] && $_[2] ne '') {
+            $self->logger(1, "Set: $_[1] = '$_[2]'");
+            $self->{$_[1]} = $_[2];
         }
-    }
+    } #done
 
     sub signal_handler {
+        # my ($self) = $_[0];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->set('RUNNING', 0);
         $self->stop();
         $_->kill('KILL')->detach() foreach Thread->list();
-    }
+    } #done +-
 
     sub start {
+        # my ($self) = $_[0];
         my ($self) = shift;
 
         if (!defined($self->{DHCP_SERVER_ID})) {
@@ -94,32 +96,37 @@ package Server; {
             exit;
         }
 
-        $self->logger(0, "BIND_ADDR: $self->{BIND_ADDR}, THREADS_COUNT: $self->{THREADS_COUNT}, PIDFILE: $self->{PIDFILE}");
+        $self->logger(0,
+            "BIND_ADDR: $self->{BIND_ADDR}, THREADS_COUNT: $self->{THREADS_COUNT}, PIDFILE: $self->{PIDFILE}");
         $self->daemon() if (defined($self->{DAEMON}));
         $self->{RUNNING} = 1;
         $self->run();
-    }
+    } #done
 
     sub stop {
+        # my ($self) = $_[0];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->{RUNNING} = 0;
         close($self->{SOCKET_RCV});
-    }
+    } #done
 
     sub logger {
-        my ($self) = shift;
-        my ($level) = shift;
+        # my ($self) = $_[0];
+        # my ($level) = $_[1];
+        # my ($message) = $_[2];
+        my ($self) = $_[0];
         my ($tid) = Thread->tid();
-        syslog('info|local0', "Thread $tid: $_[0]") if ($self->{DEBUG} >= $level);
+        syslog('info|local0', "Thread $tid: $_[2]") if ($self->{DEBUG} >= $_[1]);
         if ($self->{DEBUG} == 0) {return;}
 
         print STDOUT strftime "[%d/%b/%Y %H:%M:%S] ", localtime;
-        print STDOUT "Thread $tid: $_[0]\n";
-    }
+        print STDOUT "Thread $tid: $_[2]\n";
+    } #done
 
     sub daemon {
-        my ($self) = shift;
+        # my ($self) = $_[0];
+        my ($self) = $_[0];
         $self->logger(3, "Function: " . (caller(0))[3]);
         delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
         #POSIX::setuid(65534) or die "Can't set uid: $!\n"; # nobody
@@ -134,7 +141,7 @@ package Server; {
         open(STDERR, "+>&STDIN") or die "Can't open STDERR: $!\n";
 
         $self->logger(0, "Daemon mode");
-    }
+    } #done
 
     sub write_pid {
         my ($self) = shift;
@@ -144,7 +151,7 @@ package Server; {
             print FILE "$$\n";
             close FILE;
         }
-    }
+    } #done
 
     sub add_mirror {
         my ($self) = shift;
@@ -152,21 +159,22 @@ package Server; {
         if (defined($self->{MIRROR})) {
             $self->{ADDR_MIRROR} = sockaddr_in($self->{SERVER_PORT}, inet_aton($self->{MIRROR}));
         }
-    }
+    } #done
 
     sub send_mirror {
         my ($self) = shift;
         # my $dhcpresppkt = $_[0]
         $self->logger(3, "Function: " . (caller(0))[3]);
-        send($self->{SOCKET_RCV}, $_[0], 0, $self->{ADDR_MIRROR}) || $self->logger(1, "send mirr error: $!") if (defined($self->{ADDR_MIRROR}));
-    }
+        send($self->{SOCKET_RCV}, $_[0], 0, $self->{ADDR_MIRROR}) ||
+            $self->logger(1, "send mirr error: $!") if (defined($self->{ADDR_MIRROR}));
+    } #done
 
     sub open_socket {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
         socket($self->{SOCKET_RCV}, PF_INET, SOCK_DGRAM, getprotobyname('udp')) || die "Socket creation error: $@\n";
         bind($self->{SOCKET_RCV}, sockaddr_in($self->{SERVER_PORT}, inet_aton($self->{BIND_ADDR}))) || die "bind: $!";
-    }
+    } #done
 
     sub run {
         my ($self) = shift;
@@ -184,14 +192,14 @@ package Server; {
         # delete PID file on exit
         if (defined($self->{PIDFILE})) {unlink($self->{PIDFILE});}
         $self->logger(0, "Main: END!");
-    }
+    } #done +-
 
     sub request_loop {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         my ($buf, $fromaddr, $dhcpreq); # recv data
         my ($t0, $t1, $td); # perfomance data
         my $tid = Thread->tid(); # thread ID
+        $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(0, "START");
         # each thread make its own connection to DB
         # connect($data_source, $username, $password, \%attr)
@@ -279,7 +287,7 @@ package Server; {
         $self->{dbh}->disconnect;
 
         $self->thread_exit(0);
-    }
+    } #done +-
 
     sub thread_exit($) {
         my ($self) = shift;
@@ -290,7 +298,7 @@ package Server; {
 
         Thread->exit($_[0]) if Thread->can('exit');
         exit($_[0]);
-    }
+    } #done +-
 
     sub send_reply {
         my ($self) = shift;
@@ -338,7 +346,7 @@ package Server; {
         $self->logger(1, "Sending response to = $ipaddr:$port length = " . length($dhcpresppkt));
         # send copy of packet to mirror, if specified
         $self->send_mirror($dhcpresppkt);
-    }
+    } #done
 
     sub GenDHCPRespPkt {
         my ($self) = shift;
@@ -347,22 +355,22 @@ package Server; {
 
         my $dhcpresp = Net::DHCP::Packet->new(
             Op                           => BOOTREPLY(),
-            Htype                        => $_[0]->htype(),
-            Hlen                         => $_[0]->hlen(),
-            # Hops                       => $_[0]->hops(), # - not copyed in responce
-            Xid                          => $_[0]->xid(),
-            Secs                         => $_[0]->secs(),
-            Flags                        => $_[0]->flags(),
-            Ciaddr                       => $_[0]->ciaddr(),
-            #Yiaddr                      => '0.0.0.0',
-            Siaddr                       => $_[0]->siaddr(),
-            Giaddr                       => $_[0]->giaddr(),
-            Chaddr                       => $_[0]->chaddr(),
+            Htype                        => $_[0]->htype(), #rfc2131 - From "Assigned Numbers" RFC
+            Hlen                         => $_[0]->hlen(), #rfc2131 - must be 6 ipv4
+            # Hops                       => $_[0]->hops(),   #rfc2131 - must be 0
+            Xid                          => $_[0]->xid(), #rfc2131 - must be from client DISCOVER
+            Secs                         => $_[0]->secs(), #rfc2131 - must be 0
+            Flags                        => $_[0]->flags(), #rfc2131 - must be from client DISCOVER
+            #Ciaddr                      => $_[0]->ciaddr(), #rfc2131 - must be 0
+            #Yiaddr                      => '0.0.0.0',       #rfc2131 - must be from IP for client DISCOVER(will be setted at the next step)
+            Siaddr                       => $_[0]->siaddr(), #rfc2131 - must be from client DISCOVER if relayed
+            Giaddr                       => $_[0]->giaddr(), #rfc2131 - must be from client DISCOVER
+            Chaddr                       => $_[0]->chaddr(), #rfc2131 - must be from client DISCOVER
             DHO_DHCP_MESSAGE_TYPE()      => DHCPACK, # must be owerwritten
             DHO_DHCP_SERVER_IDENTIFIER() => $self->{DHCP_SERVER_ID}
         );
         return ($dhcpresp);
-    }
+    } #done
 
     sub BuffToHEX($) {
         my ($self) = shift;
@@ -370,24 +378,23 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         $buf =~ s/(.)/sprintf("%02x", ord($1))/eg;
         return ($buf);
-    }
+    } #done
 
     sub unpackRelayAgent(%) {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         my @SubOptions = @_;
         my $buf;
+        $self->logger(3, "Function: " . (caller(0))[3]);
 
         for (my $i = 0; defined($SubOptions[$i]); $i += 2) {
             $buf .= "($SubOptions[$i])=" . $self->BuffToHEX($SubOptions[($i + 1)]) . ', ';
         }
 
         return ($buf);
-    }
+    } #done
 
     sub GetRelayAgentOptions($$$$$$) {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         #my $dhcpreq = $_[0];
         #my $dhcp_opt82_vlan_id = $_[1];
         #my $dhcp_opt82_unit_id = $_[2];
@@ -395,6 +402,7 @@ package Server; {
         #my $dhcp_opt82_chasis_id = $_[4];
         #my $dhcp_opt82_subscriber_id = $_[5];
         my @RelayAgent;
+        $self->logger(3, "Function: " . (caller(0))[3]);
         # Set return values.
         $_[1] = $_[2] = $_[3] = $_[4] = $_[5] = '';
         # no options, return
@@ -441,14 +449,14 @@ package Server; {
         }
 
         return (1);
-    }
+    } #done +-(need to move this function to server.pl)
 
     sub FormatMAC {
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
         $_[0] =~ /([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})?([0-9a-f]{2})/i;
         return (lc(join(':', $1, $2, $3, $4, $5, $6)));
-    }
+    } #done
 
     sub subnetBits {
         my ($self) = shift;
@@ -458,24 +466,24 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         foreach (0 .. 31) {$bcnt++ if (vec($v, $_, 1) == 1);}
         return ($bcnt);
-    }
+    } #done
 
     sub mk_classless_routes_bin_mask {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         #my $net = $_[0];
         #my $mask = $_[1];
         #my $gw = $_[2];
+        $self->logger(3, "Function: " . (caller(0))[3]);
         return ($self->mk_classless_routes_bin_prefixlen($_[0], $self->subnetBits($_[1]), $_[2]));
-    }
+    } #done
 
     sub mk_classless_routes_bin_prefixlen {
         my ($self) = shift;
-        $self->logger(3, "Function: " . (caller(0))[3]);
         #my $net = $_[0];
         #my $prefixlen = $_[1];
         #my $gw = $_[2];
         my $str;
+        $self->logger(3, "Function: " . (caller(0))[3]);
         $str = pack('C', $_[1]);
 
         if ($_[1] > 0) {
@@ -489,29 +497,29 @@ package Server; {
         $str .= pack('CCCC', split(/\./, $_[2]));
 
         return ($str);
-    }
+    } #done
 
     sub check_for_me {
         my ($self) = shift;
         #my $dhcpreq = $_[0];
         $self->logger(3, "Function: " . (caller(0))[3]);
         return ($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()) eq $self->{DHCP_SERVER_ID}) ? 1 : 0;
-    }
+    } #done
 
     # handlers
     sub handle_discover {
         my ($self) = shift;
+        #my $fromaddr  = $_[0];
+        #my $dhcpreq = $_[1];
+        my ($dhcpresp);
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(2, "Got DISCOVER from giaddr = " . $_[1]->giaddr() . " for IP = " . $_[1]->ciaddr() .
                 " MAC = " . $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))) .
                 " and wont IP = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) . " send OFFER");
-        #my $fromaddr  = $_[0];
-        #my $dhcpreq = $_[1];
-        my ($dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
 
-# need to add functionality to get free ip from db if mac not listed in clients
+        # need to add functionality to get free ip from db if mac not listed in clients
 
         $self->db_check_requested_data($_[0], $_[1]);
 
@@ -553,16 +561,23 @@ package Server; {
             $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
             $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
             $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
-            $self->logger(3, "Requested_ip != Yiaddr") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr());
+            $self->logger(3, "Requested_ip != Yiaddr") if ($self->get_req_param($_[1],
+                DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr());
             $self->logger(3, "Requested_ip = ''") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '');
             $self->logger(3, "Ciaddr != Yiaddr") if ($_[1]->ciaddr() ne $dhcpresp->yiaddr());
-            $self->logger(3, "Requested_ip = '' && Ciaddr != Yiaddr") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr());
-            $self->logger(3, "Requested_ip != Yiaddr || Requested_ip = '' && Ciaddr != Yiaddr") if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr()));
+            $self->logger(3, "Requested_ip = '' && Ciaddr != Yiaddr") if ($self->get_req_param($_[1],
+                DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr());
+            $self->logger(3,
+                "Requested_ip != Yiaddr || Requested_ip = '' && Ciaddr != Yiaddr") if (($self->get_req_param($_[1],
+                DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || ($self->get_req_param($_[1],
+                DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr()));
             # ('' ne 10.111.111.52) || ('' eq '' && 10.111.111.52 ne 10.111.111.52)
             # ciaddr = ip request_ip = ''
             # ciaddr = 0.0.0.0 request_ip = ip
-            if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr() && $_[1]->ciaddr() eq '0.0.0.0') ||
-                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+            if (($self->get_req_param($_[1],
+                DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr() && $_[1]->ciaddr() eq '0.0.0.0') ||
+                ($self->get_req_param($_[1],
+                    DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
                 # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
@@ -645,7 +660,8 @@ package Server; {
         my $ciaddr = $_[1]->ciaddr();
         my $giaddr = $_[1]->giaddr();
         $self->logger(2, $_[1]->toString());
-        $self->logger(3, "ipaddr = $ipaddr port = $port mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
+        $self->logger(3,
+            "ipaddr = $ipaddr port = $port mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
         return;
     }
 
@@ -699,7 +715,8 @@ package Server; {
             return (1);
         }
 
-        if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
+        if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
             $self->logger(2, sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id));
             $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
             $sth->execute();
@@ -729,7 +746,7 @@ package Server; {
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
-        
+
         if ($_[0]->giaddr() eq '0.0.0.0') {
             $self->logger(2, "Got a packet from guest client src = " . $_[0]->ciaddr());
             $self->logger(2, sprintf("SQL: $self->{get_requested_data_guest}", $mac, $_[0]->ciaddr()));
@@ -848,7 +865,8 @@ package Server; {
             }
 
             $_[2]->addOptionRaw(DHO_STATIC_ROUTES(), $opt33_data) if (defined($opt33_data));
-            $_[2]->addOptionRaw($optClasslessRoutesCode, $opt_classless_routes_data) if (defined($opt_classless_routes_data));
+            $_[2]->addOptionRaw($optClasslessRoutesCode,
+                $opt_classless_routes_data) if (defined($opt_classless_routes_data));
         }
         $sth->finish();
     }
@@ -904,16 +922,18 @@ package Server; {
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
         $self->logger(2, sprintf("SQL: $self->{lease_decline}", $type, $mac, $client_ip, $gateway_ip, $client_ident,
-            $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
+                $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
+                $dhcp_opt82_unit_id,
+                $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip,
+            $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
         $sth->finish();
 
         return (0);
-    } #done
+    } #done +-(need remove unneeded code)
 
     sub db_lease_release {
         my ($self) = shift;
@@ -940,13 +960,14 @@ package Server; {
         my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
         my $ip = ($_[0]->ciaddr() eq '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
-        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->logger(2, sprintf("SQL: $self->{lease_ack}", $mac, $ip));
         my $sth = $self->{dbh}->prepare(sprintf($self->{lease_ack}, $mac, $ip));
         $sth->execute();
         $sth->finish();
         $self->logger(0, sprintf("LEASE: Success IP=%s for MAC=%s", $ip, $mac));
-    } #done
+    } #done +-(need remove unneeded code)
 
     sub db_log_detailed {
         my ($self) = shift;
@@ -964,12 +985,13 @@ package Server; {
         my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip, $client_ident,
+        my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip,
+            $client_ident,
             $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
             $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
         $sth->finish();
-    }
+    } #done
 
     sub get_req_param {
         my ($self) = shift;
@@ -977,7 +999,7 @@ package Server; {
         # my $param = $_[1];
         $self->logger(3, "Function: " . (caller(0))[3]);
         return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionValue($_[1]) : '';
-    }
+    } #done
 
     sub get_req_raw_param {
         my ($self) = shift;
@@ -985,7 +1007,7 @@ package Server; {
         # my $param = $_[1];
         $self->logger(3, "Function: " . (caller(0))[3]);
         return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionRaw($_[1]) : '';
-    }
+    } #done
 }
 
 1;
