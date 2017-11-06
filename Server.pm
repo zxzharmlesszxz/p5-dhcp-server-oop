@@ -524,19 +524,16 @@ package Server; {
 
     # handlers
     sub handle_discover {
+        # my ($self) = shift;
+        # my $fromaddr  = $_[0];
+        # my $dhcpreq = $_[1];
         my ($self) = shift;
-        #my $fromaddr  = $_[0];
-        #my $dhcpreq = $_[1];
         my ($dhcpresp);
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->logger(2, "Got DISCOVER from giaddr = " . $_[1]->giaddr() . " for IP = " . $_[1]->ciaddr() .
-                " MAC = " . $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))) .
-                " and wont IP = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) . " send OFFER");
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
 
         # need to add functionality to get free ip from db if mac not listed in clients
-
         $self->db_check_requested_data($_[1]);
 
         # ciaddr = 0
@@ -544,15 +541,15 @@ package Server; {
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
         if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
-            $self->send_reply($_[0], $_[1], $dhcpresp);
             $self->lease_offered($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), 30);
         }
-        else {# if AUTO_CONFIGURE (116) supported - send disable generate link local addr
+        else {
+            # if AUTO_CONFIGURE (116) supported - send disable generate link local addr
             if ($self->get_req_param($_[1], DHO_AUTO_CONFIGURE()) ne '') {
                 $dhcpresp->addOptionValue(DHO_AUTO_CONFIGURE(), 0);
-                $self->send_reply($_[0], $_[1], $dhcpresp);
             }
         }
+        $self->send_reply($_[0], $_[1], $dhcpresp);
     }
 
     sub handle_request {
@@ -563,6 +560,7 @@ package Server; {
         my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         my ($port, $addr) = unpack_sockaddr_in($_[0]);
         my $ipaddr = inet_ntoa($addr);
+        my $lease = undef;
         my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->db_check_requested_data($_[1]);
 
@@ -573,11 +571,15 @@ package Server; {
         # ciaddr = client_ip
         if ($_[1]->ciaddr() ne '0.0.0.0') {
             $self->logger(3, sprintf("Got REQUEST to BOUND/RENEW/REBIND IP = %s for MAC = %s", $_[1]->ciaddr(), $mac));
-            $self->get_lease($_[1]->ciaddr(), $mac);
+            $lease = $self->get_lease($_[1]->ciaddr(), $mac);
         }
         else {
             $self->logger(3, sprintf("Got REQUEST to GET IP = %s for MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
-            $self->get_lease($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+            $lease = $self->get_lease($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+        }
+
+        if ($lease) {
+            $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
         }
 
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
@@ -627,10 +629,11 @@ package Server; {
     }
 
     sub handle_decline {
+        # my ($self) = shift;
+        # my $fromaddr  = $_[0];
+        # my $dhcpreq = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $fromaddr  = $_[0];
-        #my $dhcpreq = $_[1];
         $self->db_check_requested_data($_[1]);
         # ciaddr = 0
         # request_ip = client_ip
@@ -639,7 +642,7 @@ package Server; {
 
     sub handle_release {
         # my ($self) = shift;
-        #my $fromaddr  = $_[0];
+        # my $fromaddr  = $_[0];
         # my ($dhcpreq) = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
@@ -648,6 +651,9 @@ package Server; {
     } #done
 
     sub handle_inform {
+        # my ($self) = shift;
+        # my $fromaddr  = $_[0];
+        # my $dhcpreq = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(2, "Got REQUEST send ACK");
@@ -1024,8 +1030,18 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
+        $self->logger(3, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $_[0], $_[1]));
+        return $self->db_get_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
+    } #done
+
+    sub check_lease {
+        # my ($self) = shift;
+        # my ($ip) = $_[0];
+        # my ($mac) = $_[1];
+        my ($self) = shift;
+        $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(3, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        return $self->db_get_lease($_[0], $_[1]);
+        return $self->db_check_lease($_[0], $_[1]);
     } #done
 
     sub free_lease {
@@ -1036,7 +1052,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(3, sprintf("LEASE: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
         # if lease found
-        if ($self->get_lease($_[0], $_[1])) {
+        if ($self->check_lease($_[0], $_[1])) {
             $self->db_free_lease($_[0], $_[1]);
         }
         return 1;
@@ -1051,7 +1067,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(3, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $_[0], $_[1]));
         # if lease found
-        if ($self->get_lease($_[0], $_[1])) {
+        if ($self->check_lease($_[0], $_[1])) {
             $self->db_update_lease_time($_[2], $_[0], $_[1]);
         }
         return 1;
@@ -1068,6 +1084,21 @@ package Server; {
     } #done
 
     sub db_get_lease {
+        # my ($self) = shift;
+        # my ($ip) = $_[0];
+        # my ($mac) = $_[1];
+        # my ($lease) = $_[2];
+        my ($self) = shift;
+        $self->logger(3, sprintf("SQL: Try to get lease for IP = %s and MAC = %s", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[0], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[0], $_[1]));
+        $sth->execute();
+        $_[2] = $sth->fetchrow_hashref() if ($sth->rows());
+        $sth->finish();
+        return $_[2];
+    } #done
+
+    sub db_check_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
         # my ($mac) = $_[1];
