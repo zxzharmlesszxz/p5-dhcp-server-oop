@@ -572,14 +572,14 @@ package Server; {
         # bound/renew/rebind
         # ciaddr = client_ip
         if ($_[1]->ciaddr() ne '0.0.0.0') {
-            $self->logger(3, "Got REQUEST to BOUND/RENEW/REBIND IP = %s for MAC = %s" . $_[1]->ciaddr(), $mac);
-            $self->logger(3, "LEASE: Try to find lease for IP = %s and MAC = %s" . $_[1]->ciaddr(), $mac);
-            $self->logger(3, "SQL: Need wrote the query to find lease for IP = %s and MAC = %s" . $_[1]->ciaddr(), $mac);
+            $self->logger(3, sprintf("Got REQUEST to BOUND/RENEW/REBIND IP = %s for MAC = %s", $_[1]->ciaddr(), $mac));
+            $self->logger(3, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $_[1]->ciaddr(), $mac));
+            $self->logger(3, sprintf("SQL: Need wrote the query to find lease for IP = %s and MAC = %s", $_[1]->ciaddr(), $mac));
         }
         else {
-            $self->logger(3, "Got REQUEST to GET IP = %s for MAC = %s" . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
-            $self->logger(3, "LEASE: Try to find lease for IP = %s and MAC = %s" . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
-            $self->logger(3, "SQL: Need wrote the query to find lease for IP = %s and MAC = %s" . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+            $self->logger(3, sprintf("Got REQUEST to GET IP = %s for MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
+            $self->logger(3, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
+            $self->logger(3, sprintf("SQL: Need wrote the query to find lease for IP = %s and MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
         }
 
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
