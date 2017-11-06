@@ -255,8 +255,7 @@ package Server; {
 
                 # send duplicate of received packet to mirror
                 $self->send_mirror($buf);
-                # print received packed
-                $self->logger(2, $dhcpreq->toString());
+                # log all to db
                 $self->db_log_detailed($dhcpreq);
 
                 # handle packet
@@ -511,6 +510,8 @@ package Server; {
         my ($dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
+
+# need to add functionality to get free ip from db if mac not listed in clients
 
         $self->db_check_requested_data($_[0], $_[1]);
 
