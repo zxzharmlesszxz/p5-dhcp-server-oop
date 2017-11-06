@@ -569,8 +569,18 @@ package Server; {
         # ciaddr = 0.0.0.0 if request and client_ip if bound/renew/rebind
         # request_ip = client_ip if request and 0 if bound/renew/rebind
 
-        if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
-        else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
+        # bound/renew/rebind
+        # ciaddr = client_ip
+        if ($_[1]->ciaddr() ne '0.0.0.0') {
+            $self->logger(3, "Got REQUEST to BOUND/RENEW/REBIND IP = %s for MAC = %s" . $_[1]->ciaddr(), $mac);
+            $self->logger(3, "LEASE: Try to find lease for IP = %s and MAC = %s" . $_[1]->ciaddr(), $mac);
+            $self->logger(3, "SQL: Need wrote the query to find lease for IP = %s and MAC = %s" . $_[1]->ciaddr(), $mac);
+        }
+        else {
+            $self->logger(3, "Got REQUEST to GET IP = %s for MAC = %s" . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+            $self->logger(3, "LEASE: Try to find lease for IP = %s and MAC = %s" . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+            $self->logger(3, "SQL: Need wrote the query to find lease for IP = %s and MAC = %s" . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+        }
 
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
         if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
