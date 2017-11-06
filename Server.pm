@@ -537,7 +537,7 @@ package Server; {
 
         # need to add functionality to get free ip from db if mac not listed in clients
 
-        $self->db_check_requested_data($_[0], $_[1]);
+        $self->db_check_requested_data($_[1]);
 
         # ciaddr = 0
         # requested_addr = client ip
@@ -564,7 +564,7 @@ package Server; {
         my ($port, $addr) = unpack_sockaddr_in($_[0]);
         my $ipaddr = inet_ntoa($addr);
         my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        $self->db_check_requested_data($_[0], $_[1]);
+        $self->db_check_requested_data($_[1]);
 
         # ciaddr = 0.0.0.0 if request and client_ip if bound/renew/rebind
         # request_ip = client_ip if request and 0 if bound/renew/rebind
@@ -573,16 +573,10 @@ package Server; {
         # ciaddr = client_ip
         if ($_[1]->ciaddr() ne '0.0.0.0') {
             $self->logger(3, sprintf("Got REQUEST to BOUND/RENEW/REBIND IP = %s for MAC = %s", $_[1]->ciaddr(), $mac));
-            $self->logger(3, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $_[1]->ciaddr(), $mac));
-            $self->logger(3, sprintf("SQL: Need wrote the query to find lease for IP = %s and MAC = %s", $_[1]->ciaddr(), $mac));
-            $self->logger(2, sprintf("SQL: SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[1]->ciaddr(), $mac));
             $self->get_lease($_[1]->ciaddr(), $mac);
         }
         else {
             $self->logger(3, sprintf("Got REQUEST to GET IP = %s for MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
-            $self->logger(3, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
-            $self->logger(3, sprintf("SQL: Need wrote the query to find lease for IP = %s and MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
-            $self->logger(2, sprintf("SQL: SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
             $self->get_lease($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
         }
 
@@ -637,7 +631,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
-        $self->db_check_requested_data($_[0], $_[1]);
+        $self->db_check_requested_data($_[1]);
         # ciaddr = 0
         # request_ip = client_ip
         $self->db_lease_decline($_[1]);
@@ -645,11 +639,10 @@ package Server; {
 
     sub handle_release {
         # my ($self) = shift;
-        # my ($fromaddr)  = $_[0];
-        # my ($dhcpreq) = $_[1];
+        # my ($dhcpreq) = $_[0];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->db_check_requested_data($_[0], $_[1]);
+        $self->db_check_requested_data($_[1]);
         $self->lease_release($_[0]->ciaddr(), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))));
     } #done
 
@@ -659,7 +652,7 @@ package Server; {
         $self->logger(2, "Got REQUEST send ACK");
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
-        $self->db_check_requested_data($_[0], $_[1]);
+        $self->db_check_requested_data($_[1]);
         my ($dhcpreqparams, $dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
@@ -677,20 +670,17 @@ package Server; {
 
     # Need to delete fromaddr from db-functions
     sub db_check_requested_data {
+        # my ($self) = shift;
+        # my ($dhcpreq) = $_[0];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $fromaddr = $_[0];
-        #my $dhcpreq = $_[1];
-        my ($port, $addr) = unpack_sockaddr_in($_[0]);
-        my $ipaddr = inet_ntoa($addr);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
-        my $requested_ip = $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS());
-        my $yiaddr = $_[1]->yiaddr();
-        my $ciaddr = $_[1]->ciaddr();
-        my $giaddr = $_[1]->giaddr();
-        $self->logger(2, $_[1]->toString());
-        $self->logger(3,
-            "ipaddr = $ipaddr port = $port mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
+        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
+        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
+        my $yiaddr = $_[0]->yiaddr();
+        my $ciaddr = $_[0]->ciaddr();
+        my $giaddr = $_[0]->giaddr();
+        $self->logger(2, $_[0]->toString());
+        $self->logger(3, "mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
         return;
     }
 
