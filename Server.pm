@@ -114,6 +114,7 @@ package Server; {
         # my ($self) = shift;
         # my ($level) = $_[0];
         # my ($message) = $_[1];
+        my ($self) = shift;
         my ($tid) = Thread->tid();
         syslog('info|local0', "Thread $tid: $_[1]") if ($self->{DEBUG} >= $_[0]);
         if ($self->{DEBUG} == 0) {return;}
