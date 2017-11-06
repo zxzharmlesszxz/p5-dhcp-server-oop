@@ -1067,9 +1067,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         $self->logger(3, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $_[0], $_[1]));
         # if lease found
-        if ($self->check_lease($_[0], $_[1])) {
-            $self->db_update_lease_time($_[2], $_[0], $_[1]);
-        }
+        $self->db_update_lease_time($_[2], $_[0], $_[1]);
         return 1;
     } #done
 
