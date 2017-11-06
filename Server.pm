@@ -545,7 +545,7 @@ package Server; {
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
         if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
             $self->send_reply($_[0], $_[1], $dhcpresp);
-            $self->db_lease_offered($dhcpresp);
+            $self->lease_offered($dhcpresp->ciaddr(), $dhcpresp->chaddr(), 30);
         }
         else {# if AUTO_CONFIGURE (116) supported - send disable generate link local addr
             if ($self->get_req_param($_[1], DHO_AUTO_CONFIGURE()) ne '') {
@@ -618,7 +618,7 @@ package Server; {
             else {
                 $self->logger(2, "Got REQUEST send ACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
-                $self->db_lease_ack($_[1]);
+                $self->lease_ack($_[1]->yiaddr(), $_[1]->chaddr(), $self->get_req_param($_[2], DHO_DHCP_LEASE_TIME()));
             }
 
             $self->send_reply($_[0], $_[1], $dhcpresp);
@@ -907,17 +907,15 @@ package Server; {
         $sth->finish();
     }
 
-    sub db_lease_offered {
+    sub lease_offered {
+        # my ($self) = shift;
+        # my ($ip) = $_[0];
+        # my ($mac) = $_[1];
+        # my ($lease_time) = $_[2];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $dhcpresp = $_[0];
-        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        $self->logger(2, sprintf("SQL: $self->{lease_offered}", $mac, $_[0]->yiaddr()));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_offered}, $mac, $_[0]->yiaddr()));
-        $sth->execute();
-        $sth->finish();
-
-        return (0);
+        $self->update_lease_time($_[0], $_[1], $_[2]);
+        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $_[1]));
     } #done
 
     sub lease_nak {
@@ -975,22 +973,16 @@ package Server; {
         $self->logger(0, sprintf("LEASE: Release IP=%s from MAC=%s", $_[0], $_[1]));
     } #done
 
-    sub db_lease_ack {
+    sub lease_ack {
+        # my ($self) = shift;
+        # my ($ip) = $_[0];
+        # my ($mac) = $_[1];
+        # my ($lease_time) = $_[2];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        #my $dhcpreq = $_[0];
-        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
-        my $ip = ($_[0]->ciaddr() eq '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
-        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        $self->logger(2, sprintf("SQL: $self->{lease_ack}", $mac, $ip));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_ack}, $mac, $ip));
-        $sth->execute();
-        $sth->finish();
-        $self->logger(0, sprintf("LEASE: Success IP=%s for MAC=%s", $ip, $mac));
-    } #done +-(need remove unneeded code)
+        $self->update_lease_time($_[0], $_[1], $_[2]);
+        $self->logger(0, sprintf("LEASE: Success ACK IP=%s for MAC=%s", $_[0], $_[1]));
+    } #done
 
     sub db_log_detailed {
         my ($self) = shift;
