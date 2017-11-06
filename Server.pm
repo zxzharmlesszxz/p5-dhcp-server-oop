@@ -1175,11 +1175,11 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';", $_[2], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';", $_[2], $_[1]));
+        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';", $_[1], $_[0]));
+        my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';", $_[1], $_[0]));
         $sth->execute();
         $sth->finish();
-        $self->logger(3, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[1], $_[2]), $_[1], $_[2]));
+        $self->logger(3, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
         return (1);
     } #done
 }
