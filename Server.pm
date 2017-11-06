@@ -915,8 +915,8 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->free_lease($_[0], $_[1]) if ($self->get_lease($_[0], $_[1]));
-        return (0);
+        $self->free_lease($_[0], $_[1]);
+        return (1);
     } #done
 
     sub db_lease_decline {
@@ -960,8 +960,9 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->free_lease($_[0], $_[1]) if ($self->get_lease($_[0], $_[1]));
+        $self->free_lease($_[0], $_[1]);
         $self->logger(0, sprintf("LEASE: Release IP=%s from MAC=%s", $_[0], $_[1]));
+        return (1);
     } #done
 
     sub lease_ack {
