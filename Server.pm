@@ -541,7 +541,7 @@ package Server; {
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
         if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
-            $self->lease_offered($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), 30);
+            $self->lease_offered($dhcpresp->yiaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), 30);
         }
         else {
             # if AUTO_CONFIGURE (116) supported - send disable generate link local addr
