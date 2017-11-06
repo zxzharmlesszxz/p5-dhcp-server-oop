@@ -639,11 +639,12 @@ package Server; {
 
     sub handle_release {
         # my ($self) = shift;
-        # my ($dhcpreq) = $_[0];
+        #my $fromaddr  = $_[0];
+        # my ($dhcpreq) = $_[1];
         my ($self) = shift;
         $self->logger(3, "Function: " . (caller(0))[3]);
-        $self->db_check_requested_data($_[0]);
-        $self->lease_release($_[0]->ciaddr(), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))));
+        $self->db_check_requested_data($_[1]);
+        $self->lease_release($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
     } #done
 
     sub handle_inform {
