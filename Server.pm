@@ -707,7 +707,7 @@ package Server; {
         $self->logger(3, "Function: " . (caller(0))[3]);
         #my $dhcpreq = $_[0];
         #my $dhcpresp = $_[1];
-        my ($mac, $sth, $dhcpreqparams, $result);
+        my ($mac, $dhcpreqparams, $result);
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
@@ -716,13 +716,20 @@ package Server; {
         my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
         my $ip = ($_[0]->ciaddr() eq '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
 
-        $self->logger(2, "Got REQUEST from IP = " . $ip);
+        $self->logger(2, "Got REQUEST for IP = " . $ip);
         $self->logger(2, sprintf("SQL: $self->{get_requested_data}", $mac, $ip, $_[0]->giaddr()));
-        $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $mac, $ip, $_[0]->giaddr()));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $mac, $ip, $_[0]->giaddr()));
         $sth->execute();
 
         if ($sth->rows()) {
             $result = $sth->fetchrow_hashref();
+            # If requested ip doesn't match IP in DB - get guest IP from this network
+            if ($ip ne $result->{ip}) {
+                $self->logger(0, sprintf("LEASE: Requested IP doesn't match %s %s", $ip, $result->{ip}));
+                $self->logger(0, sprintf("LEASE: For MAC = %s IP must be %s", $mac, $result->{ip}));
+                $self->logger(2, sprintf("SQL: $self->{get_requested_data_guest}", $mac, $_[0]->giaddr()));
+                $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_guest}, $mac, $_[0]->giaddr()));
+            }
             $_[1]->yiaddr($result->{ip});
             $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
             $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
