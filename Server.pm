@@ -517,8 +517,8 @@ package Server; {
         # ciaddr = 0
         # requested_addr = client ip
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
-        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 ||
-            $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
+        #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
+        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
             $self->send_reply($_[0], $_[1], $dhcpresp);
             $self->db_lease_offered($dhcpresp);
         }
@@ -547,7 +547,8 @@ package Server; {
         if ($port == 68) {$self->logger(2, "Got a packet from client src = $ipaddr:$port MAC = $mac");}
         else {$self->logger(2, "Got a packet from relay src = $ipaddr:$port MAC = $mac");}
 
-        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
+        #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
+        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
             $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
             $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
             $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
@@ -674,6 +675,7 @@ package Server; {
         #my $dhcpreq = $_[0];
         #my $dhcpresp = $_[1];
         my ($mac, $sth, $dhcpreqparams, $result);
+        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
         # ciaddr = 0.0.0.0 if request and client_ip if bound/renew/rebind
@@ -694,6 +696,22 @@ package Server; {
             $self->static_data_to_reply($dhcpreqparams, $_[1]);
             $sth->finish();
             return (1);
+        }
+
+        if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
+            $self->logger(2, sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id));
+            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
+            $sth->execute();
+
+            if ($sth->rows()) {
+                $result = $sth->fetchrow_hashref();
+                $_[1]->yiaddr($result->{ip});
+                $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
+                $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
+                $self->static_data_to_reply($dhcpreqparams, $_[1]);
+                $sth->finish();
+                return (1);
+            }
         }
 
         $sth->finish();
