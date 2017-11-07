@@ -557,53 +557,15 @@ package Server; {
     }
 
     sub handle_request {
+        # my ($self) = shift;
+        # my $fromaddr  = $_[0];
+        # my $dhcpreq = $_[1];
         my ($self) = shift;
-        $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $fromaddr  = $_[0];
-        #my $dhcpreq = $_[1];
         my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
-        my ($port, $addr) = unpack_sockaddr_in($_[0]);
-        my $ipaddr = inet_ntoa($addr);
-        my $lease = undef;
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
+        $self->logger(9, "Function: " . (caller(0))[3]);
         $self->db_check_requested_data($_[1]);
 
-        # ciaddr = 0.0.0.0 if request and client_ip if bound/renew/rebind
-        # request_ip = client_ip if request and 0 if bound/renew/rebind
-
-        # bound/renew/rebind
-        # ciaddr = client_ip
-        if ($_[1]->ciaddr() ne '0.0.0.0') {
-            $self->logger(3, sprintf("Got REQUEST to BOUND/RENEW/REBIND IP = %s for MAC = %s", $_[1]->ciaddr(), $mac));
-            $lease = $self->get_lease($_[1]->ciaddr(), $mac);
-        }
-        else {
-            $self->logger(3, sprintf("Got REQUEST to GET IP = %s for MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac));
-            $lease = $self->get_lease($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
-        }
-
-        if ($lease) {
-            $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
-        }
-
-        #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
-        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
-            $self->logger(3, "Requested_ip = " . $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()));
-            $self->logger(3, "Yiaddr = " . $dhcpresp->yiaddr());
-            $self->logger(3, "Ciaddr = " . $_[1]->ciaddr());
-            $self->logger(3, "Requested_ip != Yiaddr") if ($self->get_req_param($_[1],
-                DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr());
-            $self->logger(3, "Requested_ip = ''") if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '');
-            $self->logger(3, "Ciaddr != Yiaddr") if ($_[1]->ciaddr() ne $dhcpresp->yiaddr());
-            $self->logger(3, "Requested_ip = '' && Ciaddr != Yiaddr") if ($self->get_req_param($_[1],
-                DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr());
-            $self->logger(3,
-                "Requested_ip != Yiaddr || Requested_ip = '' && Ciaddr != Yiaddr") if (($self->get_req_param($_[1],
-                DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr()) || ($self->get_req_param($_[1],
-                DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr()));
-            # ('' ne 10.111.111.52) || ('' eq '' && 10.111.111.52 ne 10.111.111.52)
-            # ciaddr = ip request_ip = ''
-            # ciaddr = 0.0.0.0 request_ip = ip
+        if ($self->get_requested_data($_[1], $dhcpresp) == 1) {
             if (($self->get_req_param($_[1],
                 DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr() && $_[1]->ciaddr() eq '0.0.0.0') ||
                 ($self->get_req_param($_[1],
@@ -716,79 +678,62 @@ package Server; {
         }
     }
 
-    sub db_get_requested_data {
+    sub get_requested_data {
+        # my ($self) = shift;
+        # my $dhcpreq = $_[0];
+        # my $dhcpresp = $_[1];
         my ($self) = shift;
-        $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $dhcpreq = $_[0];
-        #my $dhcpresp = $_[1];
-        my ($result, $lease);
+        my ($result);
+        my $lease = undef;
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         my $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
-
-
-        # ciaddr = 0
-        # requested_addr = client ip
-        # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
-        if ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '0.0.0.0' && $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') {
-            $lease = $self->get_lease($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))));
-            $self->logger(3, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())))));
-        }
-        else {
-            my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-            $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-            $self->logger(3, sprintf("LEASE: Try to get new free lease for MAC = %s in VLAN = %d", $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))), $dhcp_opt82_vlan_id));
-            $lease = $self->get_lease();
-        }
-
-
-        # ciaddr = 0.0.0.0 if request and client_ip if bound/renew/rebind
-        # request_ip = client_ip if request and 0 if bound/renew/rebind
         my $requested_ip = ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
-        my $ip = ($_[0]->ciaddr() eq '0.0.0.0') ? $requested_ip : $_[0]->ciaddr();
+        my $ip = $_[0]->ciaddr();
+        $self->logger(9, "Function: " . (caller(0))[3]);
 
-        $self->logger(2, "Got REQUEST for IP = " . $ip);
-        $self->logger(2, sprintf("SQL: $self->{get_requested_data}", $mac, $ip, $_[0]->giaddr()));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $mac, $ip, $_[0]->giaddr()));
-        $sth->execute();
-
-        if ($sth->rows()) {
-            $result = $sth->fetchrow_hashref();
-            # If requested ip doesn't match IP in DB - get guest IP from this network
-            if ($ip ne $result->{ip}) {
-                $self->logger(0, sprintf("LEASE: Requested IP doesn't match %s %s", $ip, $result->{ip}));
-                $self->logger(0, sprintf("LEASE: For MAC = %s IP must be %s", $mac, $result->{ip}));
-                $self->logger(2, sprintf("SQL: $self->{get_requested_data_guest}", $mac, $_[0]->giaddr()));
-                $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_guest}, $mac, $_[0]->giaddr()));
-            }
-            $_[1]->yiaddr($result->{ip});
-            $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-            $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-            $self->static_data_to_reply($dhcpreqparams, $_[1]);
-            $sth->finish();
-            return (1);
+        # bound/renew/rebind
+        # ciaddr = client_ip
+        # request_ip = ''
+        if ($ip ne '0.0.0.0') {
+            $lease = $self->get_lease($ip, $mac);
+        }
+        # request
+        # ciaddr = 0.0.0.0
+        # request_ip = client_ip
+        elsif ($requested_ip ne '0.0.0.0') {
+            $lease = $self->get_lease($requested_ip, $mac);
         }
 
-        if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
-            $self->logger(2, sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
-            $sth->execute();
+        $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease);
+        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
-            if ($sth->rows()) {
-                $result = $sth->fetchrow_hashref();
-                $_[1]->yiaddr($result->{ip});
-                $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-                $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-                $self->static_data_to_reply($dhcpreqparams, $_[1]);
-                $sth->finish();
-                return (1);
-            }
-        }
+        my $data = $self->db_get_requested_data($mac, $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
-        $sth->finish();
+        #$self->db_data_to_reply($data, $dhcpreqparams, $_[1]);
+        #$self->db_get_routing($dhcpreqparams, $data->{subnet_id}, $_[1]);
+        #$self->static_data_to_reply($dhcpreqparams, $_[1]);
 
-        return (0);
+        return (1);
+    }
+
+    sub db_get_requested_data {
+        # my ($self) = shift;
+        # my ($mac) = $_[0];
+        # my ($ip) = $_[1];
+        # my ($dhcp_opt82_vlan_id) = $_[2];
+        # my ($dhcp_opt82_unit_id) = $_[3];
+        # my ($dhcp_opt82_port_id) = $_[4];
+        # my ($dhcp_opt82_chasis_id) = $_[5];
+        # my ($dhcp_opt82_subscriber_id) = $_[6];
+        my ($self) = shift;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(2, sprintf("SQL: mac = %s, ip = %s, dhcp_opt82_vlan_id = %s, dhcp_opt82_unit_id = %s, dhcp_opt82_port_id = %s, dhcp_opt82_chasis_id = %s, dhcp_opt82_subscriber_id = %s", $_[0], $_[1], $_[2], $_[3], $_[4], $_[5], $_[6]));
+        #my $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $_[0], $_[1],));
+        #$sth->execute();
+        #$sth->finish();
+
+        return (1);
     }
 
     sub db_get_requested_data_guest {
