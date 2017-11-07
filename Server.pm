@@ -702,6 +702,8 @@ package Server; {
             $lease = $self->get_lease($requested_ip, $_[2]);
         }
 
+        $self->logger(3, sprintf("LEASE: %s", $lease));
+
         $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease);
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->db_get_requested_data($result, $_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $_[0]->giaddr());
