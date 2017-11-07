@@ -979,10 +979,12 @@ package Server; {
         my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->logger(3, sprintf("SQL: $self->{log_detailed}", $type, $mac, $client_ip, $gateway_ip,
+            $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
+            $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip,
-            $client_ident,
-            $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
+            $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
+            $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
         $sth->finish();
     } #done
