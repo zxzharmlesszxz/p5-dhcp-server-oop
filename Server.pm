@@ -753,7 +753,16 @@ package Server; {
             $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '%s' LIMIT 1;", $_[1], $_[8]));
         }
         elsif ($_[3] ne '') {
-            $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`vlan_id` = '%s' LIMIT 1;", $_[1], $_[3]));
+            # client has mac bind ip
+            $sth = $self->{dbh}->prepare();
+            $sth->execute();
+            if ($sth->rows() > 0) {
+                $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`vlan_id` = '%s' LIMIT 1;", $_[1], $_[3]));
+            }
+            # guest
+            else {
+                $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`vlan_id` = '%s' AND `subnet`.`type` = 'guest' AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1;", $_[1], $_[3]));
+            }
         }
         else {
             return(0);
