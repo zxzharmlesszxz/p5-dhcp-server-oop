@@ -13,7 +13,7 @@ my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`
 
 my $get_routing   = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;"; #done - done
 
-my $lease_free     = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `mac` = '%s' AND `ip` = '%s';"; #done - done
+my $lease_free     = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 my $lease_add      = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';"; #done - done
 my $lease_update   = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 my $lease_time_get = "SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
