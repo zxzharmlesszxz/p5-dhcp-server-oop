@@ -1111,6 +1111,7 @@ package Server; {
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("LEASE: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
         $self->db_free_lease($_[0], $_[1], $result) if ($self->check_lease($_[0], $_[1]));
+        $self->logger(0, sprintf("LEASE: %s", $result));
         if ($result == 1) {
             $self->logger(0, sprintf("LEASE: Removed for IP = %s and MAC = %s", $_[0], $_[1]));
         }
