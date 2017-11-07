@@ -4,6 +4,8 @@ use warnings FATAL => 'all';
 use Getopt::Long;
 use Server;
 
+my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID, $THREADS_COUNT, $DBDATASOURCE, $DBLOGIN, $DBPASS, $PIDFILE, $DEBUG, $DAEMON);
+
 my $get_requested_data = "SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND (`clients`.`ip` = '%s' OR `subnets`.`gateway` = '%s') LIMIT 1;"; #done
 my $get_requested_data_guest = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` = '%s' AND `ips`.`mac` NOT IN (SELECT `mac` FROM `clients`) LIMIT 1;";
 
@@ -24,18 +26,18 @@ if ($#ARGV == - 1) {usage();}
 
 my $server = Server->new();
 GetOptions(
-    'b=s'   => my \$BIND_ADDR,
-    'sp:i'  => my \$SERVER_PORT,
-    'cp:i'  => my \$CLIENT_PORT,
-    'id=s'  => my \$DHCP_SERVER_ID,
-    'm=s'   => my \$MIRROR,
-    't:i'   => my \$THREADS_COUNT,
-    'dbs=s' => my \$DBDATASOURCE,
-    'dbl=s' => my \$DBLOGIN,
-    'dbp=s' => my \$DBPASS,
-    'P:s'   => my \$PIDFILE,
-    'v:i'   => my \$DEBUG,
-    'd'     => my \$DAEMON,
+    'b=s'   => \$BIND_ADDR,
+    'sp:i'  => \$SERVER_PORT,
+    'cp:i'  => \$CLIENT_PORT,
+    'id=s'  => \$DHCP_SERVER_ID,
+    'm=s'   => \$MIRROR,
+    't:i'   => \$THREADS_COUNT,
+    'dbs=s' => \$DBDATASOURCE,
+    'dbl=s' => \$DBLOGIN,
+    'dbp=s' => \$DBPASS,
+    'P:s'   => \$PIDFILE,
+    'v:i'   => \$DEBUG,
+    'd'     => \$DAEMON,
 );
 
 $SIG{INT} = $SIG{TERM} = $SIG{HUP} = $server->signal_handler();
