@@ -682,7 +682,7 @@ package Server; {
         # my $mac = $_[2];
         my ($self) = shift;
         my ($result);
-        my $lease = undef;
+        my $lease = 0;
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
         my $requested_ip = ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
@@ -704,21 +704,21 @@ package Server; {
 
         $self->logger(3, sprintf("LEASE: %s", $lease));
 
-        $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease);
+        $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease != 0);
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->db_get_requested_data($result, $_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $_[0]->giaddr());
 
-        if ($lease && $result->{ip} eq $lease->{ip}) {
+        if ($lease != 0 && $result->{ip} eq $lease->{ip}) {
             $_[1]->yiaddr($result->{ip});
             $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
             $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
             $self->static_data_to_reply($dhcpreqparams, $_[1]);
             return (1);
         }
-        elsif ($lease && $result->{ip} ne $lease->{ip}) {
+        elsif ($lease != 0 && $result->{ip} ne $lease->{ip}) {
             return (0);
         }
-        elsif (defined($lease) == 0 && $result->{ip}) {
+        elsif ($lease == 0 && $result->{ip}) {
             $_[1]->yiaddr($result->{ip});
             $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
             $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
