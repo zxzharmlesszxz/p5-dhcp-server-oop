@@ -706,11 +706,23 @@ package Server; {
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->db_get_requested_data($result, $_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $_[0]->giaddr());
 
-        if ($result->{ip} eq $lease->{ip}) {
+        if ($lease && $result->{ip} eq $lease->{ip}) {
             $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
             $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
             $self->static_data_to_reply($dhcpreqparams, $_[1]);
             return (1);
+        }
+        elsif ($lease && $result->{ip} ne $lease->{ip}) {
+            return (0);
+        }
+        elsif (defined($lease) == 0 && $result->{ip}) {
+            $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
+            $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
+            $self->static_data_to_reply($dhcpreqparams, $_[1]);
+            return (1);
+        }
+        else {
+            return (0);
         }
 
         return (0);
