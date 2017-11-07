@@ -620,18 +620,18 @@ package Server; {
         # my $fromaddr  = $_[0];
         # my $dhcpreq = $_[1];
         my ($self) = shift;
+        my ($dhcpreqparams, $dhcpresp);
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, "Got REQUEST send ACK");
         #my $fromaddr  = $_[0];
         #my $dhcpreq = $_[1];
         $self->db_check_requested_data($_[1]);
-        my ($dhcpreqparams, $dhcpresp);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
 
         # ciaddr = client_ip
         # request_ip = 0
-        if ($self->db_get_requested_data($_[1], $dhcpresp) == 0) {
+        if ($self->get_requested_data($_[1], $dhcpresp) == 0) {
             $dhcpreqparams = $self->get_req_param($_[1], DHO_DHCP_PARAMETER_REQUEST_LIST());
             $self->static_data_to_reply($dhcpreqparams, $dhcpresp);
         }
@@ -725,11 +725,20 @@ package Server; {
         # my ($dhcp_opt82_chasis_id) = $_[6];
         # my ($dhcp_opt82_subscriber_id) = $_[7];
         my ($self) = shift;
+        my $sth;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("SQL: mac = %s, ip = %s, dhcp_opt82_vlan_id = %s, dhcp_opt82_unit_id = %s, dhcp_opt82_port_id = %s, dhcp_opt82_chasis_id = %s, dhcp_opt82_subscriber_id = %s", $_[1], $_[2], $_[3], $_[4], $_[5], $_[6], $_[7]));
+        if ($_[2] ne '0.0.0.0') {
+            $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `clients`.`ip` = '%s' LIMIT 1;", $_[1], $_[2]));
+        }
         #my $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $_[0], $_[1],));
-        #$sth->execute();
-        #$sth->finish();
+        $sth->execute();
+        if ($sth->rows()) {
+            $_[0] = $sth->fetchrow_hashref();
+            $sth->finish();
+            return (1);
+        }
+        $sth->finish();
 
         return (1);
     }
