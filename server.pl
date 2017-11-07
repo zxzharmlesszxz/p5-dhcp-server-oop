@@ -40,7 +40,7 @@ GetOptions(
     'd'     => \$DAEMON,
 );
 
-$SIG{INT} = $SIG{TERM} = $SIG{HUP} = $server->signal_handler();
+$SIG{INT} = $SIG{TERM} = $SIG{HUP} = sub {$server->signal_handler();};
 $SIG{PIPE} = 'IGNORE';
 
 $server->set('DEBUG', $DEBUG);
