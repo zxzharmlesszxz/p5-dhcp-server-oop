@@ -1132,7 +1132,7 @@ package Server; {
         #my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free}, $_[0], $_[1]));
         #$_[2] = $sth->execute();
         #$sth->finish();
-        $_[2] = $self->{dbh}->do($self->{lease_free}, $_[0], $_[1]);
+        $_[2] = $self->{dbh}->do(sprintf($self->{lease_free}, $_[0], $_[1]));
     } #done - done
 
     # get lease time (return lease time in seconds)
