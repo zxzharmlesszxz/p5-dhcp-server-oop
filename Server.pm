@@ -706,28 +706,27 @@ package Server; {
 
         $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease);
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-
-        my $data = $self->db_get_requested_data($_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-
-        #$self->db_data_to_reply($data, $dhcpreqparams, $_[1]);
-        #$self->db_get_routing($dhcpreqparams, $data->{subnet_id}, $_[1]);
-        #$self->static_data_to_reply($dhcpreqparams, $_[1]);
+        $self->db_get_requested_data($result, $_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
+        $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
+        $self->static_data_to_reply($dhcpreqparams, $_[1]);
 
         return (1);
     }
 
     sub db_get_requested_data {
         # my ($self) = shift;
-        # my ($mac) = $_[0];
-        # my ($ip) = $_[1];
-        # my ($dhcp_opt82_vlan_id) = $_[2];
-        # my ($dhcp_opt82_unit_id) = $_[3];
-        # my ($dhcp_opt82_port_id) = $_[4];
-        # my ($dhcp_opt82_chasis_id) = $_[5];
-        # my ($dhcp_opt82_subscriber_id) = $_[6];
+        # my $result = $_[0];
+        # my ($mac) = $_[1];
+        # my ($ip) = $_[2];
+        # my ($dhcp_opt82_vlan_id) = $_[3];
+        # my ($dhcp_opt82_unit_id) = $_[4];
+        # my ($dhcp_opt82_port_id) = $_[5];
+        # my ($dhcp_opt82_chasis_id) = $_[6];
+        # my ($dhcp_opt82_subscriber_id) = $_[7];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("SQL: mac = %s, ip = %s, dhcp_opt82_vlan_id = %s, dhcp_opt82_unit_id = %s, dhcp_opt82_port_id = %s, dhcp_opt82_chasis_id = %s, dhcp_opt82_subscriber_id = %s", $_[0], $_[1], $_[2], $_[3], $_[4], $_[5], $_[6]));
+        $self->logger(2, sprintf("SQL: mac = %s, ip = %s, dhcp_opt82_vlan_id = %s, dhcp_opt82_unit_id = %s, dhcp_opt82_port_id = %s, dhcp_opt82_chasis_id = %s, dhcp_opt82_subscriber_id = %s", $_[1], $_[2], $_[3], $_[4], $_[5], $_[6], $_[7]));
         #my $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $_[0], $_[1],));
         #$sth->execute();
         #$sth->finish();
