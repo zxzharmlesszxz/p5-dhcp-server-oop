@@ -726,14 +726,25 @@ package Server; {
         # my ($dhcp_opt82_port_id) = $_[5];
         # my ($dhcp_opt82_chasis_id) = $_[6];
         # my ($dhcp_opt82_subscriber_id) = $_[7];
+        # my ($giaddr) = $_[8];
         my ($self) = shift;
         my $sth;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("SQL: mac = %s, ip = %s, dhcp_opt82_vlan_id = %s, dhcp_opt82_unit_id = %s, dhcp_opt82_port_id = %s, dhcp_opt82_chasis_id = %s, dhcp_opt82_subscriber_id = %s", $_[1], $_[2], $_[3], $_[4], $_[5], $_[6], $_[7]));
+        $self->logger(2, sprintf("SQL: mac = %s, ip = %s, dhcp_opt82_vlan_id = %s, dhcp_opt82_unit_id = %s, dhcp_opt82_port_id = %s, dhcp_opt82_chasis_id = %s, dhcp_opt82_subscriber_id = %s, giaddr = %s", $_[1], $_[2], $_[3], $_[4], $_[5], $_[6], $_[7], $_[8]));
+
         if ($_[2] ne '0.0.0.0') {
             $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `clients`.`ip` = '%s' LIMIT 1;", $_[1], $_[2]));
         }
-        #my $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data}, $_[0], $_[1],));
+        elsif ($_[8] ne '0.0.0.0') {
+            $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`gateway` = '%s' LIMIT 1;", $_[1], $_[8]));
+        }
+        elsif ($_[3] ne '') {
+            $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `subnets`.`vlan_id` = '%s' LIMIT 1;", $_[1], $_[3]));
+        }
+        else {
+            return(0);
+        }
+
         $sth->execute();
         if ($sth->rows()) {
             $_[0] = $sth->fetchrow_hashref();
