@@ -540,10 +540,8 @@ package Server; {
         # chaddr       = client_mac
         # requested_ip = client_ip or 0.0.0.0
         # opt82        = true(always if enabled) or false
-        # select * from `subnets`, `ips`, `clients` where `client`.`mac` = '$mac' and `ips`.`vlan_id` = '$vlan'
 
         $self->db_check_requested_data($_[1]);
-        #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
         if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
             $self->lease_offered($dhcpresp->yiaddr(), $mac, 30);
         }
@@ -707,11 +705,15 @@ package Server; {
         $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease);
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->db_get_requested_data($result, $_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-        $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-        $self->static_data_to_reply($dhcpreqparams, $_[1]);
 
-        return (1);
+        if ($result->{ip} eq $lease->{ip}) {
+            $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
+            $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
+            $self->static_data_to_reply($dhcpreqparams, $_[1]);
+            return (1);
+        }
+
+        return (0);
     }
 
     sub db_get_requested_data {
