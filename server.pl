@@ -18,7 +18,7 @@ my $lease_add      = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac`
 my $lease_update   = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 my $lease_time_get = "SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 my $lease_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;"; #done - done
-my $lease_get      = $lease_check; #done - done
+my $lease_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 
 my $log_detailed  = "INSERT INTO `dhcp_log` (`created`,`type`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');"; #done
 
