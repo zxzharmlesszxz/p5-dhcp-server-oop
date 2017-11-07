@@ -628,7 +628,7 @@ package Server; {
 
         # ciaddr = client_ip
         # request_ip = 0
-        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 0) {
+        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
             $dhcpreqparams = $self->get_req_param($_[1], DHO_DHCP_PARAMETER_REQUEST_LIST());
             $self->static_data_to_reply($dhcpreqparams, $dhcpresp);
         }
