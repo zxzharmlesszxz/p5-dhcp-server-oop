@@ -1110,7 +1110,7 @@ package Server; {
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("LEASE: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $result = $self->db_free_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
+        $self->db_free_lease($_[0], $_[1], $result) if ($self->check_lease($_[0], $_[1]));
         if ($result == 1) {
             $self->logger(0, sprintf("LEASE: Removed for IP = %s and MAC = %s", $_[0], $_[1]));
         }
@@ -1124,13 +1124,13 @@ package Server; {
         # my ($self) = shift;
         # my ($ip) = $_[0];
         # my ($mac) = $_[1];
+        # my ($result) = $_[2];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
         $self->logger(3, sprintf("SQL: $self->{lease_free}", $_[0], $_[1]));
         my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free}, $_[0], $_[1]));
-        my $result = $sth->execute();
+        $_[2] = $sth->execute();
         $sth->finish();
-        return ($result);
     } #done - done
 
     # get lease time (return lease time in seconds)
