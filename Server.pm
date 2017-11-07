@@ -589,7 +589,7 @@ package Server; {
             $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
             $dhcpresp->ciaddr('0.0.0.0');
             $dhcpresp->yiaddr('0.0.0.0');
-            $self->lease_nak($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
+            $self->lease_nak($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
             $self->send_reply($_[0], $_[1], $dhcpresp);
         }
     }
