@@ -688,6 +688,7 @@ package Server; {
         my $requested_ip = ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
         my $ip = $_[0]->ciaddr();
         $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(9, sprintf("ip = %s, requested_ip = %s", $ip, $requested_ip));
 
         # bound/renew/rebind
         # ciaddr = client_ip
