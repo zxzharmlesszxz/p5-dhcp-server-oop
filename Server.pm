@@ -707,6 +707,7 @@ package Server; {
         $self->db_get_requested_data($result, $_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id, $_[0]->giaddr());
 
         if ($lease && $result->{ip} eq $lease->{ip}) {
+            $_[1]->yiaddr($result->{ip});
             $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
             $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
             $self->static_data_to_reply($dhcpreqparams, $_[1]);
@@ -716,6 +717,7 @@ package Server; {
             return (0);
         }
         elsif (defined($lease) == 0 && $result->{ip}) {
+            $_[1]->yiaddr($result->{ip});
             $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
             $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
             $self->static_data_to_reply($dhcpreqparams, $_[1]);
