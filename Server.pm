@@ -530,10 +530,10 @@ package Server; {
         # my ($self) = shift;
         # my $fromaddr  = $_[0];
         # my $dhcpreq = $_[1];
-        my ($self) = shift;
-        my ($dhcpresp);
+        my $self = shift;
+        my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
+        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
 
         # ciaddr       = 0
@@ -544,8 +544,8 @@ package Server; {
 
         $self->db_check_requested_data($_[1]);
         #if ($self->db_get_requested_data($_[1], $dhcpresp) == 1 || $self->db_get_requested_data_guest($_[1], $dhcpresp) == 1) {
-        if ($self->db_get_requested_data($_[1], $dhcpresp) == 1) {
-            $self->lease_offered($dhcpresp->yiaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), 30);
+        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
+            $self->lease_offered($dhcpresp->yiaddr(), $mac, 30);
         }
         else {
             # if AUTO_CONFIGURE (116) supported - send disable generate link local addr
@@ -562,25 +562,24 @@ package Server; {
         # my $dhcpreq = $_[1];
         my ($self) = shift;
         my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
+        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->db_check_requested_data($_[1]);
 
-        if ($self->get_requested_data($_[1], $dhcpresp) == 1) {
-            if (($self->get_req_param($_[1],
-                DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr() && $_[1]->ciaddr() eq '0.0.0.0') ||
-                ($self->get_req_param($_[1],
-                    DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
+            if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr() && $_[1]->ciaddr() eq '0.0.0.0') ||
+                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
                 # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-                $self->lease_nak($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
+                $self->lease_nak($_[1]->ciaddr(), $mac);
                 $dhcpresp->ciaddr('0.0.0.0');
                 $dhcpresp->yiaddr('0.0.0.0');
             }
             else {
                 $self->logger(2, "Got REQUEST send ACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
-                $self->lease_ack($dhcpresp->yiaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
+                $self->lease_ack($dhcpresp->yiaddr(), $mac, $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
             }
 
             $self->send_reply($_[0], $_[1], $dhcpresp);
@@ -589,7 +588,7 @@ package Server; {
             $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
             $dhcpresp->ciaddr('0.0.0.0');
             $dhcpresp->yiaddr('0.0.0.0');
-            $self->lease_nak($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
+            $self->lease_nak($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
             $self->send_reply($_[0], $_[1], $dhcpresp);
         }
     }
@@ -682,11 +681,11 @@ package Server; {
         # my ($self) = shift;
         # my $dhcpreq = $_[0];
         # my $dhcpresp = $_[1];
+        # my $mac = $_[2];
         my ($self) = shift;
         my ($result);
         my $lease = undef;
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
         my $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
         my $requested_ip = ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
         my $ip = $_[0]->ciaddr();
@@ -696,19 +695,19 @@ package Server; {
         # ciaddr = client_ip
         # request_ip = ''
         if ($ip ne '0.0.0.0') {
-            $lease = $self->get_lease($ip, $mac);
+            $lease = $self->get_lease($ip, $_[2]);
         }
         # request
         # ciaddr = 0.0.0.0
         # request_ip = client_ip
         elsif ($requested_ip ne '0.0.0.0') {
-            $lease = $self->get_lease($requested_ip, $mac);
+            $lease = $self->get_lease($requested_ip, $_[2]);
         }
 
         $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease);
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
-        my $data = $self->db_get_requested_data($mac, $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        my $data = $self->db_get_requested_data($_[2], $ip, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
         #$self->db_data_to_reply($data, $dhcpreqparams, $_[1]);
         #$self->db_get_routing($dhcpreqparams, $data->{subnet_id}, $_[1]);
