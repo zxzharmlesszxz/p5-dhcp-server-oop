@@ -573,14 +573,14 @@ package Server; {
                 # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-                $self->lease_nak($_[1]->ciaddr(), $mac);
+                $self->lease_nak($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
                 $dhcpresp->ciaddr('0.0.0.0');
                 $dhcpresp->yiaddr('0.0.0.0');
             }
             else {
                 $self->logger(2, "Got REQUEST send ACK");
                 $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
-                $self->lease_ack($dhcpresp->yiaddr(), $mac, $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
+                $self->lease_ack($dhcpresp->yiaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
             }
 
             $self->send_reply($_[0], $_[1], $dhcpresp);
