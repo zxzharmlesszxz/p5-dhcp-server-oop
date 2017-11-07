@@ -116,11 +116,11 @@ package Server; {
         # my ($message) = $_[1];
         my ($self) = shift;
         my ($tid) = Thread->tid();
-        syslog('info|local0', "Thread $tid: $_[1]") if ($self->{DEBUG} >= $_[0]);
-        if ($self->{DEBUG} == 0) {return;}
-
-        print STDOUT strftime "[%d/%b/%Y %H:%M:%S] ", localtime;
-        print STDOUT "Thread $tid: $_[1]\n";
+        if ($self->{DEBUG} >= $_[0]) {
+            syslog('info|local0', "Thread $tid: $_[1]");
+            print STDOUT strftime "[%d/%b/%Y %H:%M:%S] ", localtime;
+            print STDOUT "Thread $tid: $_[1]\n";
+        }
     } #done
 
     sub daemon {
