@@ -48,15 +48,17 @@ package Server; {
             DEBUG                    => 0,
             DAEMON                   => undef,
             RUNNING                  => 0,
+            lease_free               => '',
+            lease_add                => '',
+            lease_update             => '',
+            lease_time_get           => '',
+            lease_check              => '',
+            lease_get                => '',
+            get_routing              => '',
+
             get_requested_data       => '',
             get_requested_data_guest => '',
             get_requested_data_opt82 => '',
-            get_routing              => '',
-            lease_offered            => '',
-            lease_nak                => '',
-            lease_decline            => '',
-            lease_release            => '',
-            lease_ack                => '',
             log_detailed             => '',
             dbh                      => undef
         };
@@ -650,7 +652,7 @@ package Server; {
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->db_check_requested_data($_[1]);
         $self->lease_release($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
-    } #done
+    } #done - done
 
     sub handle_inform {
         # my ($self) = shift;
@@ -829,11 +831,12 @@ package Server; {
     }
 
     sub db_data_to_reply {
+        # my ($self) = shift;
+        # my $result = $_[0];
+        # my $dhcpreqparams = $_[1];
+        # my $dhcpresp = $_[2];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $result = $_[0];
-        #my $dhcpreqparams = $_[1];
-        #my $dhcpresp = $_[2];
         if (defined($_[0]->{dhcp_lease_time})) {
             $_[2]->addOptionValue(DHO_DHCP_LEASE_TIME(), $_[0]->{dhcp_lease_time});
 
@@ -868,18 +871,19 @@ package Server; {
     }
 
     sub db_get_routing {
+        # my ($self) = shift;
+        # my $dhcpreqparams = $_[0];
+        # my $subnet_id = $_[1];
+        # my $dhcpresp = $_[2];
         my ($self) = shift;
-        $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $dhcpreqparams = $_[0];
-        #my $subnet_id = $_[1];
-        #my $dhcpresp = $_[2];
         my ($sth, $opt33Enbled, $optClasslessRoutesCode);
+        $self->logger(9, "Function: " . (caller(0))[3]);
         # do not add routes if not requested
         return() if (defined($_[0]) == 0);
         $opt33Enbled = index($_[0], DHO_STATIC_ROUTES());
         $opt33Enbled = undef if ($opt33Enbled == - 1);
-
         $optClasslessRoutesCode = index($_[0], 121);
+
         if ($optClasslessRoutesCode == - 1) {
             $optClasslessRoutesCode = index($_[0], 249); # MSFT
             if ($optClasslessRoutesCode == - 1) {$optClasslessRoutesCode = undef;}
@@ -930,9 +934,8 @@ package Server; {
         # my ($lease_time) = $_[2];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->add_lease($_[0], $_[1], $_[2]);
-        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $_[1]));
-    } #done
+        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $_[1])) if ($self->add_lease($_[0], $_[1], $_[2]) == 1);
+    } #done - done
 
     sub lease_nak {
         # my ($self) = shift;
@@ -941,43 +944,26 @@ package Server; {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->free_lease($_[0], $_[1]);
-        return (1);
-    } #done
+    } #done - done
 
     sub db_lease_decline {
+        # my ($self) = shift;
+        # my $dhcpreq = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $dhcpreq = $_[0];
+
         # this function need to understand how to must work
         #
         # request_ip = client_ip
         # ciaddr = 0
-        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        my $client_ip = $_[0]->ciaddr();
-        my $gateway_ip = $_[0]->giaddr();
-        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()));
-        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
-        my $hostname = $self->get_req_param($_[0], DHO_HOST_NAME());
-        my $dhcp_vendor_class = $self->get_req_param($_[0], DHO_VENDOR_CLASS_IDENTIFIER());
-        my $dhcp_user_class = $self->get_req_param($_[0], DHO_USER_CLASS());
-        my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
-        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
 
-        $self->logger(2, sprintf("SQL: $self->{lease_decline}", $type, $mac, $client_ip, $gateway_ip, $client_ident,
-                $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
-                $dhcp_opt82_unit_id,
-                $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_decline}, $type, $mac, $client_ip, $gateway_ip,
-            $client_ident,
-            $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id, $dhcp_opt82_unit_id,
-            $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
-        $sth->execute();
-        $sth->finish();
+        $self->logger(0, sprintf("Need to add functionality to this function, IP = %s already obtained by other client", $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS())));
+        #my $sth = $self->{dbh}->prepare("");
+        #$sth->execute();
+        #$sth->finish();
 
         return (0);
-    } #done +-(need remove unneeded code)
+    } #done
 
     sub lease_release {
         # my ($self) = shift;
@@ -986,8 +972,6 @@ package Server; {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->free_lease($_[0], $_[1]);
-        $self->logger(0, sprintf("LEASE: Release IP=%s from MAC=%s", $_[0], $_[1]));
-        return (1);
     } #done
 
     sub lease_ack {
@@ -998,8 +982,7 @@ package Server; {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->update_lease_time($_[0], $_[1], $_[2]);
-        $self->logger(0, sprintf("LEASE: Success ACK IP=%s for MAC=%s", $_[0], $_[1]));
-    } #done
+    } #done - done
 
     sub db_log_detailed {
         my ($self) = shift;
@@ -1059,13 +1042,13 @@ package Server; {
         $self->logger(3, sprintf("LEASE: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
         $result = $self->db_add_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]) == 0);
         if ($result == 1) {
-            $self->logger(3, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
         }
         else {
-            $self->logger(3, sprintf("LEASE: Not added lease for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not added lease for IP = %s and MAC = %s", $_[0], $_[1]));
         }
         return ($result);
-    } #done
+    } #done - done
 
     sub db_add_lease {
         # my ($self) = shift;
@@ -1073,12 +1056,12 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';", $_[1], $_[0]));
-        my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';", $_[1], $_[0]));
+        $self->logger(3, sprintf("SQL: $self->{lease_add}", $_[1], $_[0]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_add}, $_[1], $_[0]));
         my $result = $sth->execute();
         $sth->finish();
         return ($result);
-    } #done
+    } #done - done
 
     # get lease (return array|undef)
     sub get_lease {
@@ -1089,7 +1072,7 @@ package Server; {
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $_[0], $_[1]));
         return $self->db_get_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
-    } #done
+    } #done - done
 
     sub db_get_lease {
         # my ($self) = shift;
@@ -1098,13 +1081,13 @@ package Server; {
         my ($self) = shift;
         my ($lease) = undef;
         $self->logger(3, sprintf("SQL: Try to get lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{lease_get}", $_[0], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_get}, $_[0], $_[1]));
         $sth->execute();
         $lease = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
         return $lease;
-    } #done
+    } #done - done
 
     #check lease if exists (return 0,1)
     sub check_lease {
@@ -1112,10 +1095,18 @@ package Server; {
         # my ($ip) = $_[0];
         # my ($mac) = $_[1];
         my ($self) = shift;
+        my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        return $self->db_check_lease($_[0], $_[1]);
-    } #done
+        $result = $self->db_check_lease($_[0], $_[1]);
+        if ($result == 1) {
+            $self->logger(0, sprintf("LEASE: Found for IP = %s and MAC = %s", $_[0], $_[1]));
+        }
+        else {
+            $self->logger(0, sprintf("LEASE: Not found for IP = %s and MAC = %s", $_[0], $_[1]));
+        }
+        return ($result);
+    } #done - done
 
     sub db_check_lease {
         # my ($self) = shift;
@@ -1123,13 +1114,13 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to find lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{lease_check}", $_[0], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_check}, $_[0], $_[1]));
         $sth->execute();
         my $lease = $sth->rows();
         $sth->finish();
         return ($lease);
-    } #done
+    } #done - done
 
     # free lease (return -1,0,1)
     sub free_lease {
@@ -1142,13 +1133,13 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
         $result = $self->db_free_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
         if ($result == 1) {
-            $self->logger(2, sprintf("LEASE: Removed for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Removed for IP = %s and MAC = %s", $_[0], $_[1]));
         }
         else {
-            $self->logger(2, sprintf("LEASE: Not removed for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not removed for IP = %s and MAC = %s", $_[0], $_[1]));
         }
         return ($result);
-    } #done
+    } #done - done
 
     sub db_free_lease {
         # my ($self) = shift;
@@ -1156,12 +1147,12 @@ package Server; {
         # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{lease_free}", $_[0], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free}, $_[0], $_[1]));
         my $result = $sth->execute();
         $sth->finish();
         return ($result);
-    } #done
+    } #done - done
 
     # get lease time (return lease time in seconds)
     sub get_lease_time {
@@ -1174,13 +1165,13 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
         $time = $self->db_get_lease_time($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
         if (defined($time) != 0) {
-            $self->logger(2, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $_[1], $time));
+            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $_[1], $time));
         }
         else {
-            $self->logger(2, sprintf("LEASE: Cann't get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Cann't get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
         }
         return ($time);
-    } #done
+    } #done - done
 
     sub db_get_lease_time {
         # my ($self) = shift;
@@ -1190,13 +1181,13 @@ package Server; {
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(3, sprintf("SQL: Try to get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf("SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{lease_time_get}", $_[0], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_time_get}, $_[0], $_[1]));
         $sth->execute();
         $result = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
         return $result->{lease_time};
-    } #done
+    } #done - done
 
     # update lease time (return -1,0,1)
     sub update_lease_time {
@@ -1210,13 +1201,13 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $_[0], $_[1]));
         $result = $self->db_update_lease_time($_[2], $_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
         if ($result == 1) {
-            $self->logger(2, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
         }
         else {
-            $self->logger(2, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
         }
         return ($result);
-    } #done
+    } #done - done
 
     sub db_update_lease_time {
         # my ($self) = shift;
@@ -1226,12 +1217,12 @@ package Server; {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(3, sprintf("SQL: Try to update lease time for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1], $_[2]));
-        my $sth = $self->{dbh}->prepare(sprintf("UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';", $_[0], $_[1], $_[2]));
+        $self->logger(3, sprintf("SQL: $self->{lease_update}", $_[0], $_[1], $_[2]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_update}, $_[0], $_[1], $_[2]));
         my $result = $sth->execute();
         $sth->finish();
         return ($result);
-    } #done
+    } #done - done
 }
 
 1;
