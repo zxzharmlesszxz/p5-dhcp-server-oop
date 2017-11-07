@@ -728,14 +728,14 @@ package Server; {
         # ciaddr = 0
         # requested_addr = client ip
         # check in db client_ip = requested_ip and client_mac = chaddr ext. gateway = giaddr, opt82...
-        if ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne '0.0.0.0') {
-            $lease = $self->get_lease($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
-            $self->logger(3, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())))));
+        if ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '0.0.0.0') {
+            $lease = $self->get_lease($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))));
+            $self->logger(3, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()), $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())))));
         }
         else {
             my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-            $self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-            $self->logger(3, sprintf("LEASE: Try to get new free lease for MAC = %s in VLAN = %d", $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))), $dhcp_opt82_vlan_id));
+            $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+            $self->logger(3, sprintf("LEASE: Try to get new free lease for MAC = %s in VLAN = %d", $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen()))), $dhcp_opt82_vlan_id));
             $lease = $self->get_lease();
         }
 
