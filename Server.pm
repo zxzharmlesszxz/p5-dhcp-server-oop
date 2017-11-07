@@ -620,16 +620,15 @@ package Server; {
         my ($self) = shift;
         my ($dhcpreqparams, $dhcpresp);
         $self->logger(9, "Function: " . (caller(0))[3]);
+        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(2, "Got REQUEST send ACK");
-        #my $fromaddr  = $_[0];
-        #my $dhcpreq = $_[1];
         $self->db_check_requested_data($_[1]);
         $dhcpresp = $self->GenDHCPRespPkt($_[1]);
         $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
 
         # ciaddr = client_ip
         # request_ip = 0
-        if ($self->get_requested_data($_[1], $dhcpresp) == 0) {
+        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 0) {
             $dhcpreqparams = $self->get_req_param($_[1], DHO_DHCP_PARAMETER_REQUEST_LIST());
             $self->static_data_to_reply($dhcpreqparams, $dhcpresp);
         }
@@ -702,8 +701,6 @@ package Server; {
         elsif ($requested_ip ne '0.0.0.0') {
             $lease = $self->get_lease($requested_ip, $_[2]);
         }
-
-        $self->logger(3, sprintf("LEASE: %s", $lease));
 
         $self->logger(3, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time})) if ($lease != 0);
         $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
