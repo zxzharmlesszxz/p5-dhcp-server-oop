@@ -54,6 +54,7 @@ package Server; {
             lease_time_get           => '',
             lease_check              => '',
             lease_get                => '',
+            lease_free_get           => '',
             is_fixed                 => '',
             lease_fixed_check        => '',
             lease_fixed_get          => '',
@@ -685,7 +686,7 @@ package Server; {
         my ($self) = shift;
         my ($result);
         my $lease = 0;
-        #my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
         my $requested_ip = ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
         my $ip = $_[0]->ciaddr();
@@ -710,8 +711,8 @@ package Server; {
         # lease exists
         if ($lease != 0) {
             $self->logger(0, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
-            #$self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-            $self->db_get_requested_data($result, $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip), $lease->{subnet_id});
+            $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+            $self->db_get_requested_data($result, $lease->{subnet_id}, '');
             if ($result != 0) {
                 $_[1]->yiaddr($lease->{ip});
                 $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
@@ -724,17 +725,33 @@ package Server; {
         else {
             $self->logger(0, sprintf("LEASE: Doesn't exists for %s %s", $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
             $self->logger(3, sprintf("LEASE: Try to get free lease for %s %s", $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
+            $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
             # need subnet_id
-            #if ($self->is_fixed($_[2], )) {
-
-            #}
-            $self->db_get_requested_data($result, $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip), $_[0]->giaddr());
-            if ($lease == 0 && $result->{ip}) {
-                $_[1]->yiaddr($result->{ip});
-                $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-                $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-                $self->static_data_to_reply($dhcpreqparams, $_[1]);
-                return (1);
+            $self->get_subnet_id(my $subnet, $_[0]->giaddr());
+            $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
+            if ($self->is_fixed($_[2], $subnet->{subnet_id})) {
+                $self->db_get_requested_data($result, $subnet->{subnet_id});
+                $self->get_free_lease($lease, $subnet->{subnet_id});
+                if ($lease == 0 && $lease->{ip}) {
+                    $_[1]->yiaddr($lease->{ip});
+                    $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
+                    $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
+                    $self->static_data_to_reply($dhcpreqparams, $_[1]);
+                    return (1);
+                }
+            }
+            else {
+                $self->get_subnet_id($subnet, $_[0]->giaddr(), 'guest');
+                $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
+                $self->db_get_requested_data($result, $subnet->{subnet_id});
+                $self->get_free_lease($lease, $subnet->{subnet_id});
+                if ($lease == 0 && $lease->{ip}) {
+                    $_[1]->yiaddr($lease->{ip});
+                    $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
+                    $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
+                    $self->static_data_to_reply($dhcpreqparams, $_[1]);
+                    return (1);
+                }
             }
         }
 
@@ -744,16 +761,14 @@ package Server; {
     sub db_get_requested_data {
         # my ($self) = shift;
         # my $result = $_[0];
-        # my ($mac) = $_[1];
-        # my ($ip) = $_[2];
-        # my ($subnet_id) = $_[3];
+        # my ($subnet_id) = $_[1];
         my ($self) = shift;
         my $sth;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("SQL: mac = %s, ip = %s, subnet_id = %s", $_[1], $_[2], $_[3]));
+        $self->logger(2, sprintf("SQL: subnet_id = %s", $_[1]));
 
-        if ($_[3] ne '') {
-            $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets` WHERE `subnets`.`subnet_id` = '%s' LIMIT 1;", $_[3]));
+        if ($_[1]) {
+            $sth = $self->{dbh}->prepare(sprintf("SELECT * FROM `subnets` WHERE `subnet_id` = '%s' LIMIT 1;", $_[1]));
             $sth->execute();
             if ($sth->rows()) {
                 $_[0] = $sth->fetchrow_hashref();
@@ -766,6 +781,35 @@ package Server; {
             return(0);
         }
         return (0);
+    }
+
+    sub db_get_subnet_id {
+        # my ($self) = shift;
+        # my $result = $_[0];
+        # my ($gw) = $_[1];
+        # my ($type) = $_[2];
+        my ($self) = shift;
+        my $sth;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(2, sprintf("SQL: get subnet_id by gw = % and type = %s", $_[1], $_[2]));
+
+        if ($_[2]) {
+            $sth = $self->{dbh}->prepare(sprintf("SELECT `subnet_id` FROM `subnets` WHERE `gateway` = '%s' AND `type` = '%s' LIMIT 1;", $_[1], $_[2]));
+        }
+        else {
+            $sth = $self->{dbh}->prepare(sprintf("SELECT `subnet_id` FROM `subnets` WHERE `gateway` = '%s' AND `type` != 'guest' LIMIT 1;", $_[1]));
+        }
+
+        $sth->execute();
+        if ($sth->rows()) {
+            $_[0] = $sth->fetchrow_hashref();
+            $sth->finish();
+            return (1);
+        }
+
+        $sth->finish();
+        return (0);
+
     }
 
     sub db_get_requested_data_guest {
@@ -1149,6 +1193,30 @@ package Server; {
         $lease = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
         return $lease;
+    } #done - done
+
+    # get free lease (return array|undef)
+    sub get_free_lease {
+        # my ($self) = shift;
+        # my ($lease) = $_[0];
+        # my ($subnet_id) = $_[1];
+        my ($self) = shift;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(2, sprintf("LEASE: Try to get free lease for subnet_id = %s", $_[1]));
+        $self->db_get_free_lease($_[0], $_[1]);
+    } #done - done
+
+    sub db_get_free_lease {
+        # my ($self) = shift;
+        # my ($lease) = $_[0];
+        # my ($subnet_id) = $_[1];
+        my ($self) = shift;
+        $self->logger(3, sprintf("SQL: Try to get free lease for subnet_id = %s", $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{lease_free_get}", $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free_get}, $_[1]));
+        $sth->execute();
+        $_[0] = $sth->fetchrow_hashref() if ($sth->rows());
+        $sth->finish();
     } #done - done
 
     #check lease if exists (return 0,1)

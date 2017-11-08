@@ -21,7 +21,9 @@ my $lease_check          = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%
 my $lease_get            = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 
 my $lease_fixed_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
-my $lease_fixed_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s' AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s');"; #done - done
+my $lease_fixed_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s' AND `ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s');"; #done - done
+
+my $lease_free_get       = "SELECT * FROM `ips` WHERE `mac` = NULL AND `ip` NOT IN (SELECT `ip` FROM `clients`);";
 
 my $is_fixed             = "SELECT * FROM `clients` WHERE `mac` = '%s' AND `subnet_id` = %s LIMIT 1;"; #done - done
 
@@ -66,6 +68,7 @@ $server->set('lease_update', $lease_update);
 $server->set('lease_time_get', $lease_time_get);
 $server->set('lease_check', $lease_check);
 $server->set('lease_get', $lease_get);
+$server->set('lease_free_get', $lease_free_get);
 $server->set('is_fixed', $is_fixed);
 $server->set('lease_fixed_check', $lease_fixed_check);
 $server->set('lease_fixed_get', $lease_fixed_get);
