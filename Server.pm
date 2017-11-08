@@ -1093,8 +1093,8 @@ package Server; {
         # my ($subnet_id) = $_[1];
         my ($self) = shift;
         $self->logger(3, sprintf("SQL: Try to get fixed lease for MAC = %s in SUBNET = %s", $self->{mac}, $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get2}", $_[1], $self->{mac}, $self->{mac}));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get2}, $_[1], $self->{mac}, $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get2}", $_[1], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get2}, $_[1], $self->{mac}));
         $sth->execute();
         $_[0] = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();

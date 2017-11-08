@@ -22,7 +22,7 @@ my $lease_get            = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%
 
 my $lease_fixed_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
 my $lease_fixed_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s' AND `ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s');"; #done - done
-my $lease_fixed_get2      = "SELECT * FROM `ips` WHERE `subnet_id` = '%s' AND `mac` = '%s' AND `ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s');"; #done - done
+my $lease_fixed_get2     = "SELECT * FROM `ips` WHERE `subnet_id` = '%s' AND `ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s');"; #done - done
 
 my $lease_free_get       = "SELECT * FROM `ips` WHERE `mac` = NULL AND `ip` NOT IN (SELECT `ip` FROM `clients`);";
 
