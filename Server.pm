@@ -69,11 +69,11 @@ package Server; {
             get_requested_data_opt82 => '',
             log_detailed             => '',
             dbh                      => undef,
-            dhcp_opt82_vlan_id       => NULL,
-            dhcp_opt82_unit_id       => NULL,
-            dhcp_opt82_port_id       => NULL,
-            dhcp_opt82_chasis_id     => NULL,
-            dhcp_opt82_subscriber_id => NULL
+            dhcp_opt82_vlan_id       => undef,
+            dhcp_opt82_unit_id       => undef,
+            dhcp_opt82_port_id       => undef,
+            dhcp_opt82_chasis_id     => undef,
+            dhcp_opt82_subscriber_id => undef
         };
 
         bless $self, $class;
