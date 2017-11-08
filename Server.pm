@@ -551,7 +551,7 @@ package Server; {
 
         $self->db_check_requested_data();
         if ($self->get_requested_data() == 1) {
-            $self->lease_offered($self->{dhcpresp}->yiaddr(), 30);
+            $self->lease_offered();
         }
         else {
             # if AUTO_CONFIGURE (116) supported - send disable generate link local addr
@@ -905,10 +905,9 @@ package Server; {
 
     sub lease_offered {
         # my ($self) = shift;
-        # my ($ip) = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $self->{mac})) if ($self->add_lease($_[0]) == 1);
+        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $self->{dhcpresp}->yiaddr(), $self->{mac})) if ($self->add_lease($self->{dhcpresp}->yiaddr()) == 1);
     } #done - done
 
     sub lease_nak {
