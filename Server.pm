@@ -1102,20 +1102,22 @@ package Server; {
     sub is_fixed {
         # my ($self) = shift;
         # my ($mac) = $_[0];
+        # my ($subnet_id) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Check is static lease for MAC = %s", $_[0]));
-        return $self->db_is_fixed_lease($_[0]);
+        $self->logger(2, sprintf("LEASE: Check is static lease for MAC = %s in SUBNET = %s", $_[0], $_[1]));
+        return $self->db_is_fixed_lease($_[0], $_[1]);
     }
 
     sub db_is_fixed_lease {
         # my ($self) = shift;
         # my ($mac) = $_[0];
+        # my ($subnet_id) = $_[1];
         my ($self) = shift;
         my ($lease) = 0;
-        $self->logger(3, sprintf("SQL: Check is fixed lease for MAC = %s", $_[0]));
-        $self->logger(3, sprintf("SQL: $self->{is_fixed}", $_[0]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{is_fixed}, $_[0]));
+        $self->logger(3, sprintf("SQL: Check is fixed lease for MAC = %s in SUBNET = %s", $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{is_fixed}", $_[0], $_[1]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{is_fixed}, $_[0], $_[1]));
         $sth->execute();
         $lease = $sth->rows();
         $sth->finish();
