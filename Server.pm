@@ -271,7 +271,7 @@ package Server; {
                 next if ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_MESSAGE_TYPE()) eq '');
 
                 # Is message for us?
-                next if ($self->check_for_me();
+                next if ($self->check_for_me());
 
                 # RRAS client, ignory them
                 next if ($self->get_req_raw_param($self->{dhcpreq}, DHO_USER_CLASS()) eq "RRAS.Microsoft");
