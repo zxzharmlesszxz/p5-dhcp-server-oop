@@ -255,7 +255,6 @@ package Server; {
             $buf = undef;
 
             eval {
-                $self->reset();
                 # catch fatal errors
                 # receive packet
                 $self->{fromaddr} = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger(0, "recv err: $!");
@@ -301,6 +300,7 @@ package Server; {
                 else {
                     $self->reset();
                 }
+                $self->reset();
 
                 if ($self->{DEBUG} > 0) {
                     $t1 = Benchmark->new;
@@ -322,11 +322,11 @@ package Server; {
         $self->{dhcpreq} = undef;
         $self->{dhcpresp} = undef;
         $self->{fromaddr} = undef;
-        $self->{dhcp_opt82_chasis_id} = undef;
-        $self->{dhcp_opt82_unit_id} = undef;
-        $self->{dhcp_opt82_port_id} = undef;
-        $self->{dhcp_opt82_vlan_id} = undef;
-        $self->{dhcp_opt82_subscriber_id} = undef;
+        $self->{dhcp_opt82_chasis_id} = 'NULL';
+        $self->{dhcp_opt82_unit_id} = 'NULL';
+        $self->{dhcp_opt82_port_id} = 'NULL';
+        $self->{dhcp_opt82_vlan_id} = 'NULL';
+        $self->{dhcp_opt82_subscriber_id} = 'NULL';
     }
 
     sub thread_exit($) {
