@@ -783,6 +783,18 @@ package Server; {
         return (0);
     }
 
+    sub get_subnet_id {
+        # my ($self) = shift;
+        # my $result = $_[0];
+        # my ($gw) = $_[1];
+        # my ($type) = $_[2];
+        my ($self) = shift;
+        my $sth;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(2, sprintf("SUBNET: get subnet_id by gw = % and type = %s", $_[1], $_[2]));
+        $self->db_get_subnet_id($_[0], $_[1], $_[2]);
+    }
+
     sub db_get_subnet_id {
         # my ($self) = shift;
         # my $result = $_[0];
