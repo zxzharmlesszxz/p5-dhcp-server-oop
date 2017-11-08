@@ -47,6 +47,9 @@ package Server; {
             PIDFILE                  => '/var/run/dhcpd.pid',
             DEBUG                    => 0,
             DAEMON                   => undef,
+            fromaddr                 => undef,
+            dhcpreq                  => undef,
+            dhcpresp                 => undef,
             RUNNING                  => 0,
             lease_free               => '',
             lease_add                => '',
@@ -207,7 +210,8 @@ package Server; {
     sub request_loop {
         # my ($self) = shift;
         my ($self) = shift;
-        my ($buf, $fromaddr, $dhcpreq); # recv data
+        my ($buf); # recv data
+
         my ($t0, $t1, $td); # perfomance data
         my $tid = Thread->tid(); # thread ID
         $self->logger(9, "Function: " . (caller(0))[3]);
@@ -247,7 +251,7 @@ package Server; {
             eval {
                 # catch fatal errors
                 # receive packet
-                $fromaddr = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger(0, "recv err: $!");
+                $self->{fromaddr} = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger(0, "recv err: $!");
 
                 next if ($!); # continue loop if an error occured
 
@@ -257,35 +261,37 @@ package Server; {
                 if ($self->{DEBUG} > 0) {$t0 = Benchmark->new;}
 
                 # parce data to dhcp structes
-                $dhcpreq = Net::DHCP::Packet->new($buf);
+                $self->{dhcpreq} = Net::DHCP::Packet->new($buf);
 
                 # filter bad params in head
-                next if ($dhcpreq->op() != BOOTREQUEST || $dhcpreq->isDhcp() == 0);
-                next if ($dhcpreq->htype() != HTYPE_ETHER || $dhcpreq->hlen() != 6);
+                next if ($self->{dhcpreq}->op() != BOOTREQUEST || $self->{dhcpreq}->isDhcp() == 0);
+                next if ($self->{dhcpreq}->htype() != HTYPE_ETHER || $self->{dhcpreq}->hlen() != 6);
 
                 # bad DHCP message!
-                next if ($self->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE()) eq '');
+                next if ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_MESSAGE_TYPE()) eq '');
 
                 # Is message for us?
-                next if ($self->check_for_me($dhcpreq));
+                next if ($self->check_for_me();
 
                 # RRAS client, ignory them
-                next if ($self->get_req_raw_param($dhcpreq, DHO_USER_CLASS()) eq "RRAS.Microsoft");
+                next if ($self->get_req_raw_param($self->{dhcpreq}, DHO_USER_CLASS()) eq "RRAS.Microsoft");
 
                 # send duplicate of received packet to mirror
                 $self->send_mirror($buf);
                 # log all to db
                 my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-                $self->GetRelayAgentOptions($dhcpreq, $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-                $self->db_log_detailed($dhcpreq);
+                $self->{mac} = $self->FormatMAC(substr($self->{dhcpreq}->chaddr(), 0, (2 * $self->{dhcpreq}->hlen())));
+                $self->GenDHCPRespPkt();
+                $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+                $self->db_log_detailed();
 
                 # handle packet
-                my $type = $self->get_req_param($dhcpreq, DHO_DHCP_MESSAGE_TYPE());
-                if ($type == DHCPDISCOVER) {$self->handle_discover($fromaddr, $dhcpreq);}#-> DHCPOFFER
-                elsif ($type == DHCPREQUEST) {$self->handle_request($fromaddr, $dhcpreq);}#-> DHCPACK/DHCPNAK
-                elsif ($type == DHCPDECLINE) {$self->handle_decline($fromaddr, $dhcpreq);}
-                elsif ($type == DHCPRELEASE) {$self->handle_release($fromaddr, $dhcpreq);}
-                elsif ($type == DHCPINFORM) {$self->handle_inform($fromaddr, $dhcpreq);}#-> DHCPACK
+                my $type = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_MESSAGE_TYPE());
+                if ($type == DHCPDISCOVER) {$self->handle_discover();}#-> DHCPOFFER
+                elsif ($type == DHCPREQUEST) {$self->handle_request();}#-> DHCPACK/DHCPNAK
+                elsif ($type == DHCPDECLINE) {$self->handle_decline();}
+                elsif ($type == DHCPRELEASE) {$self->handle_release();}
+                elsif ($type == DHCPINFORM) {$self->handle_inform();}#-> DHCPACK
                 else {}
 
                 if ($self->{DEBUG} > 0) {
@@ -317,29 +323,26 @@ package Server; {
 
     sub send_reply {
         # my ($self) = shift;
-        # my $fromaddr = $_[0];
-        # my $dhcpreq = $_[1];
-        # my $dhcpresp = $_[2];
         my ($self) = shift;
         my ($dhcpresppkt, $toaddr);
         # add last!!!!
-        my $agent_opt = $self->get_req_raw_param($_[1], DHO_DHCP_AGENT_OPTIONS());
+        my $agent_opt = $self->get_req_raw_param($self->{dhcpreq}, DHO_DHCP_AGENT_OPTIONS());
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $_[2]->addOptionRaw(DHO_DHCP_AGENT_OPTIONS(), $agent_opt) if ($agent_opt ne '');
-        $dhcpresppkt = $_[2]->serialize();
+        $self->{dhcpresp}->addOptionRaw(DHO_DHCP_AGENT_OPTIONS(), $agent_opt) if ($agent_opt ne '');
+        $dhcpresppkt = $self->{dhcpresp}->serialize();
 
-        if ($_[1]->giaddr() eq '0.0.0.0') {
+        if ($self->{dhcpreq}->giaddr() eq '0.0.0.0') {
             # client local, not relayed
             # always broadcast DHCPNAK
-            if ($_[2]->DHO_DHCP_MESSAGE_TYPE() == DHCPNAK) {$toaddr = $self->{ADDR_BCAST};}
+            if ($self->{dhcpresp}->DHO_DHCP_MESSAGE_TYPE() == DHCPNAK) {$toaddr = $self->{ADDR_BCAST};}
             else {
-                if ($_[1]->ciaddr() eq '0.0.0.0') {
+                if ($self->{dhcpreq}->ciaddr() eq '0.0.0.0') {
                     # ALL HERE NON RFC 2131 4.1 COMPLIANT!!!
                     # perl can not send to hw addr unicast with ip 0.0.0.0, and we send broadcast
-                    if ($_[1]->flags() == 0 || 1) {
+                    if ($self->{dhcpreq}->flags() == 0 || 1) {
                         # send unicast XXXXXXXXX - flags ignored!
                         # here we mast send unicast to hw addr, ip 0.0.0.0
-                        my ($port, $addr) = unpack_sockaddr_in($_[0]);
+                        my ($port, $addr) = unpack_sockaddr_in($self->{fromaddr});
                         my $ipaddr = inet_ntoa($addr);
 
                         if ($ipaddr eq '0.0.0.0') {$toaddr = $self->{ADDR_BCAST};}
@@ -350,11 +353,11 @@ package Server; {
                     else {$toaddr = $self->{ADDR_BCAST};}
                 }
                 # client have IP addr, send unicast
-                else {$toaddr = sockaddr_in($self->{CLIENT_PORT}, $_[1]->ciaddrRaw());}
+                else {$toaddr = sockaddr_in($self->{CLIENT_PORT}, $self->{dhcpreq}->ciaddrRaw());}
             }
         }
         # send to relay
-        else {$toaddr = sockaddr_in($self->{SERVER_PORT}, $_[1]->giaddrRaw());}
+        else {$toaddr = sockaddr_in($self->{SERVER_PORT}, $self->{dhcpreq}->giaddrRaw());}
         send($self->{SOCKET_RCV}, $dhcpresppkt, 0, $toaddr) || $self->logger(0, "send error: $!");
 
         my ($port, $addr) = unpack_sockaddr_in($toaddr);
@@ -366,27 +369,25 @@ package Server; {
 
     sub GenDHCPRespPkt {
         # my ($self) = shift;
-        # my $dhcpreq = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
 
-        my $dhcpresp = Net::DHCP::Packet->new(
+        $self->{dhcpresp} = Net::DHCP::Packet->new(
             Op                           => BOOTREPLY(),
-            Htype                        => $_[0]->htype(), #rfc2131 - From "Assigned Numbers" RFC
-            Hlen                         => $_[0]->hlen(), #rfc2131 - must be 6 ipv4
-            # Hops                       => $_[0]->hops(),   #rfc2131 - must be 0
-            Xid                          => $_[0]->xid(), #rfc2131 - must be from client DISCOVER
-            Secs                         => $_[0]->secs(), #rfc2131 - must be 0
-            Flags                        => $_[0]->flags(), #rfc2131 - must be from client DISCOVER
+            Htype                        => $self->{dhcpreq}->htype(), #rfc2131 - From "Assigned Numbers" RFC
+            Hlen                         => $self->{dhcpreq}->hlen(), #rfc2131 - must be 6 ipv4
+            # Hops                       => $self->{dhcpreq->hops(),   #rfc2131 - must be 0
+            Xid                          => $self->{dhcpreq}->xid(), #rfc2131 - must be from client DISCOVER
+            Secs                         => $self->{dhcpreq}->secs(), #rfc2131 - must be 0
+            Flags                        => $self->{dhcpreq}->flags(), #rfc2131 - must be from client DISCOVER
             #Ciaddr                      => $_[0]->ciaddr(), #rfc2131 - must be 0
             #Yiaddr                      => '0.0.0.0',       #rfc2131 - must be from IP for client DISCOVER(will be setted at the next step)
-            Siaddr                       => $_[0]->siaddr(), #rfc2131 - must be from client DISCOVER if relayed
-            Giaddr                       => $_[0]->giaddr(), #rfc2131 - must be from client DISCOVER
-            Chaddr                       => $_[0]->chaddr(), #rfc2131 - must be from client DISCOVER
+            Siaddr                       => $self->{dhcpreq}->siaddr(), #rfc2131 - must be from client DISCOVER if relayed
+            Giaddr                       => $self->{dhcpreq}->giaddr(), #rfc2131 - must be from client DISCOVER
+            Chaddr                       => $self->{dhcpreq}->chaddr(), #rfc2131 - must be from client DISCOVER
             DHO_DHCP_MESSAGE_TYPE()      => DHCPACK, # must be owerwritten
             DHO_DHCP_SERVER_IDENTIFIER() => $self->{DHCP_SERVER_ID}
         );
-        return ($dhcpresp);
     } #done
 
     sub BuffToHEX($) {
@@ -415,20 +416,19 @@ package Server; {
 
     sub GetRelayAgentOptions($$$$$$) {
         my ($self) = shift;
-        # my $dhcpreq = $_[0];
-        # my $dhcp_opt82_vlan_id = $_[1];
-        # my $dhcp_opt82_unit_id = $_[2];
-        # my $dhcp_opt82_port_id = $_[3];
-        # my $dhcp_opt82_chasis_id = $_[4];
-        # my $dhcp_opt82_subscriber_id = $_[5];
+        # my $dhcp_opt82_vlan_id = $_[0];
+        # my $dhcp_opt82_unit_id = $_[1];
+        # my $dhcp_opt82_port_id = $_[2];
+        # my $dhcp_opt82_chasis_id = $_[3];
+        # my $dhcp_opt82_subscriber_id = $_[4];
         my @RelayAgent;
         $self->logger(9, "Function: " . (caller(0))[3]);
         # Set return values.
-        $_[1] = $_[2] = $_[3] = $_[4] = $_[5] = '';
+        $_[0] = $_[1] = $_[2] = $_[3] = $_[4] = '';
         # no options, return
-        return(0) if (defined($_[0]->getOptionRaw(DHO_DHCP_AGENT_OPTIONS())) == 0);
+        return(0) if (defined($self->{dhcpreq}->getOptionRaw(DHO_DHCP_AGENT_OPTIONS())) == 0);
 
-        @RelayAgent = $_[0]->decodeRelayAgent($_[0]->getOptionRaw(DHO_DHCP_AGENT_OPTIONS()));
+        @RelayAgent = $self->{dhcpreq}->decodeRelayAgent($self->{dhcpreq}->getOptionRaw(DHO_DHCP_AGENT_OPTIONS()));
         $self->logger(1, "RelayAgent: " . @RelayAgent);
 
         for (my $i = 0; defined($RelayAgent[$i]); $i += 2) {
@@ -438,32 +438,32 @@ package Server; {
                 next if (length($RelayAgent[($i + 1)]) < 4);
                 # first bytes must be: 00 04
                 # zte has 'eth 1/0/8:4096.444 0/0/0/0/0/0' (not packed string) /^(\w+)\s(\d+)\/(\d+)\/(\d+):(\d+)\.(\d+)\s(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/
-                #$_[1] = unpack('n', substr($RelayAgent[($i + 1)], -4, 2)); # may be 's'
+                #$_[0] = unpack('n', substr($RelayAgent[($i + 1)], -4, 2)); # may be 's'
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=\ )/;
-                $_[1] = $1;
-                $self->logger(1, "RelayAgent VLan: " . $_[1]);
-                #$_[2] = unpack('C', substr($RelayAgent[($i + 1)], -2, 1));
+                $_[0] = $1;
+                $self->logger(1, "RelayAgent VLan: " . $_[0]);
+                #$_[1] = unpack('C', substr($RelayAgent[($i + 1)], -2, 1));
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=\/\d+:)/;
-                $_[2] = $1;
-                $self->logger(1, "RelayAgent Unit: " . $_[2]);
-                #$_[3] = unpack('C', substr($RelayAgent[($i + 1)], -1, 1));
+                $_[1] = $1;
+                $self->logger(1, "RelayAgent Unit: " . $_[1]);
+                #$_[2] = unpack('C', substr($RelayAgent[($i + 1)], -1, 1));
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=:)/;
-                $_[3] = $1;
-                $self->logger(1, "RelayAgent Port: " . $_[3]);
+                $_[2] = $1;
+                $self->logger(1, "RelayAgent Port: " . $_[2]);
             }
             elsif ($RelayAgent[$i] == 2) {
                 # Remote ID
                 next if (length($RelayAgent[($i + 1)]) < 6);
                 # first bytes must be: 00 06 or 01 06 or 02 xx
                 # first digit - format/data type, second - len
-                $_[4] = $self->FormatMAC(unpack("H*", substr($RelayAgent[($i + 1)], - 6, 6)));
-                $self->logger(1, "RelayAgent 4: " . $_[4]);
+                $_[3] = $self->FormatMAC(unpack("H*", substr($RelayAgent[($i + 1)], - 6, 6)));
+                $self->logger(1, "RelayAgent 4: " . $_[3]);
                 # 02 xx - contain vlan num, undone
             }
             elsif ($RelayAgent[$i] == 6) {
                 # Subscriber ID
-                $_[5] = $RelayAgent[($i + 1)];
-                $self->logger(1, "RelayAgent 5: " . $_[5]);
+                $_[4] = $RelayAgent[($i + 1)];
+                $self->logger(1, "RelayAgent 5: " . $_[4]);
             }
             else {}
         }
@@ -524,138 +524,119 @@ package Server; {
 
     sub check_for_me {
         # my ($self) = shift;
-        # my $dhcpreq = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        return ($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()) eq $self->{DHCP_SERVER_ID}) ? 1 : 0;
+        return ($self->get_req_raw_param($self->{dhcpreq}, DHO_DHCP_CLIENT_IDENTIFIER()) eq $self->{DHCP_SERVER_ID}) ? 1 : 0;
     } #done
 
     # handlers functions
 
     sub handle_discover {
         # my ($self) = shift;
-        # my $fromaddr  = $_[0];
-        # my $dhcpreq = $_[1];
         my $self = shift;
-        my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
+        $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
 
         # ciaddr       = 0
         # chaddr       = client_mac
         # requested_ip = client_ip or 0.0.0.0
         # opt82        = true(always if enabled) or false
 
-        $self->db_check_requested_data($_[1]);
-        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
-            $self->lease_offered($dhcpresp->yiaddr(), $mac, 30);
+        $self->db_check_requested_data();
+        if ($self->get_requested_data() == 1) {
+            $self->lease_offered($self->{dhcpresp}->yiaddr(), 30);
         }
         else {
             # if AUTO_CONFIGURE (116) supported - send disable generate link local addr
-            if ($self->get_req_param($_[1], DHO_AUTO_CONFIGURE()) ne '') {
-                $dhcpresp->addOptionValue(DHO_AUTO_CONFIGURE(), 0);
+            if ($self->get_req_param($self->{dhcpreq}, DHO_AUTO_CONFIGURE()) ne '') {
+                $self->{dhcpresp}->addOptionValue(DHO_AUTO_CONFIGURE(), 0);
             }
         }
-        $self->send_reply($_[0], $_[1], $dhcpresp);
+        $self->send_reply();
     }
 
     sub handle_request {
         # my ($self) = shift;
-        # my $fromaddr  = $_[0];
-        # my $dhcpreq = $_[1];
         my ($self) = shift;
-        my $dhcpresp = $self->GenDHCPRespPkt($_[1]);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->db_check_requested_data($_[1]);
+        $self->db_check_requested_data();
 
-        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
-            if (($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) ne $dhcpresp->yiaddr() && $_[1]->ciaddr() eq '0.0.0.0') ||
-                ($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $_[1]->ciaddr() ne $dhcpresp->yiaddr())) {
+        if ($self->get_requested_data() == 1) {
+            if (($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) ne $self->{dhcpresp}->yiaddr() && $self->{dhcpreq}->ciaddr() eq '0.0.0.0') ||
+                ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $self->{dhcpreq}->ciaddr() ne $self->{dhcpresp}->yiaddr())) {
                 # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
-                $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-                $self->lease_nak($_[1]->ciaddr(), $mac);
-                $dhcpresp->ciaddr('0.0.0.0');
-                $dhcpresp->yiaddr('0.0.0.0');
+                $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
+                $self->lease_nak($self->{dhcpreq}->ciaddr());
+                $self->{dhcpresp}->ciaddr('0.0.0.0');
+                $self->{dhcpresp}->yiaddr('0.0.0.0');
             }
             else {
                 $self->logger(2, "Got REQUEST send ACK");
-                $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
-                $self->lease_ack($dhcpresp->yiaddr(), $mac, $self->get_req_param($dhcpresp, DHO_DHCP_LEASE_TIME()));
+                $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
+                $self->lease_ack($self->{dhcpresp}->yiaddr(), $self->get_req_param($self->{dhcpresp}, DHO_DHCP_LEASE_TIME()));
             }
 
-            $self->send_reply($_[0], $_[1], $dhcpresp);
+            $self->send_reply();
         }
         else {
-            $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-            $dhcpresp->ciaddr('0.0.0.0');
-            $dhcpresp->yiaddr('0.0.0.0');
-            $self->lease_nak($self->get_req_param($_[1], DHO_DHCP_REQUESTED_ADDRESS()), $mac);
-            $self->send_reply($_[0], $_[1], $dhcpresp);
+            $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
+            $self->{dhcpresp}->ciaddr('0.0.0.0');
+            $self->{dhcpresp}->yiaddr('0.0.0.0');
+            $self->lease_nak($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()));
+            $self->send_reply();
         }
     }
 
     sub handle_decline {
         # my ($self) = shift;
-        # my $fromaddr  = $_[0];
-        # my $dhcpreq = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->db_check_requested_data($_[1]);
+        $self->db_check_requested_data();
         # ciaddr = 0
         # request_ip = client_ip
-        $self->db_lease_decline($_[1]);
+        $self->db_lease_decline();
     } #done
 
     sub handle_release {
         # my ($self) = shift;
-        # my $fromaddr  = $_[0];
-        # my ($dhcpreq) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->db_check_requested_data($_[1]);
-        $self->lease_release($_[1]->ciaddr(), $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen()))));
+        $self->db_check_requested_data();
+        $self->lease_release();
     } #done - done
 
     sub handle_inform {
         # my ($self) = shift;
-        # my $fromaddr  = $_[0];
-        # my $dhcpreq = $_[1];
         my ($self) = shift;
-        my ($dhcpreqparams, $dhcpresp);
+        my ($dhcpreqparams);
         $self->logger(9, "Function: " . (caller(0))[3]);
-        my $mac = $self->FormatMAC(substr($_[1]->chaddr(), 0, (2 * $_[1]->hlen())));
         $self->logger(2, "Got REQUEST send ACK");
-        $self->db_check_requested_data($_[1]);
-        $dhcpresp = $self->GenDHCPRespPkt($_[1]);
-        $dhcpresp->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
+        $self->db_check_requested_data();
+        $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
 
         # ciaddr = client_ip
         # request_ip = 0
-        if ($self->get_requested_data($_[1], $dhcpresp, $mac) == 1) {
-            $dhcpreqparams = $self->get_req_param($_[1], DHO_DHCP_PARAMETER_REQUEST_LIST());
-            $self->static_data_to_reply($dhcpreqparams, $dhcpresp);
+        if ($self->get_requested_data() == 1) {
+            $dhcpreqparams = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_PARAMETER_REQUEST_LIST());
+            $self->static_data_to_reply($dhcpreqparams);
         }
 
-        $self->send_reply($_[0], $_[1], $dhcpresp);
+        $self->send_reply();
     }
 
 
     # Need to delete fromaddr from db-functions
     sub db_check_requested_data {
         # my ($self) = shift;
-        # my ($dhcpreq) = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
-        my $yiaddr = $_[0]->yiaddr();
-        my $ciaddr = $_[0]->ciaddr();
-        my $giaddr = $_[0]->giaddr();
-        $self->logger(2, $_[0]->toString());
-        $self->logger(3, "mac = $mac requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
+        my $requested_ip = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS());
+        my $yiaddr = $self->{dhcpreq}->yiaddr();
+        my $ciaddr = $self->{dhcpreq}->ciaddr();
+        my $giaddr = $self->{dhcpreq}->giaddr();
+        $self->logger(2, $self->{dhcpreq}->toString());
+        $self->logger(3, "mac = $self->{mac} requested_ip = $requested_ip yiaddr = $yiaddr ciaddr = $ciaddr giaddr = $giaddr");
         return;
     }
 
@@ -663,35 +644,31 @@ package Server; {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         #my $dhcpreqparams = $_[0];
-        #my $dhcpresp = $_[1];
         # do not add params if not requested
         return() if (defined($_[0]) == 0);
-        if (index($_[0], DHO_ROUTER_DISCOVERY()) != - 1) {$_[1]->addOptionValue(DHO_ROUTER_DISCOVERY(), 0);}
-        if (index($_[0], DHO_NTP_SERVERS()) != - 1) {$_[1]->addOptionValue(DHO_NTP_SERVERS(), '8.8.8.8 8.8.8.8');}
-        if (index($_[0], DHO_NETBIOS_NODE_TYPE()) != - 1) {$_[1]->addOptionValue(DHO_NETBIOS_NODE_TYPE(), 8);} # H-Node
+        if (index($_[0], DHO_ROUTER_DISCOVERY()) != - 1) {$self->{dhcpresp}->addOptionValue(DHO_ROUTER_DISCOVERY(), 0);}
+        if (index($_[0], DHO_NTP_SERVERS()) != - 1) {$self->{dhcpresp}->addOptionValue(DHO_NTP_SERVERS(), '8.8.8.8 8.8.8.8');}
+        if (index($_[0], DHO_NETBIOS_NODE_TYPE()) != - 1) {$self->{dhcpresp}->addOptionValue(DHO_NETBIOS_NODE_TYPE(), 8);} # H-Node
         # Option 43 must be last for Windows XP proper work
         # https://support.microsoft.com/en-us/kb/953761
         if (index($_[0], DHO_VENDOR_ENCAPSULATED_OPTIONS()) != - 1) {
             # 001 - NetBIOS over TCP/IP (NetBT): 00000002 (2) - disabled
             # 002 - Release DHCP Lease on Shutdown: 00000001 (1) - enabled
             # 255 - END
-            $_[1]->addOptionRaw(DHO_VENDOR_ENCAPSULATED_OPTIONS(),
+            $self->{dhcpresp}->addOptionRaw(DHO_VENDOR_ENCAPSULATED_OPTIONS(),
                 "\x01\x04\x00\x00\x00\x02\x02\x04\x00\x00\x00\x01\xff");
         }
     }
 
     sub get_requested_data {
         # my ($self) = shift;
-        # my $dhcpreq = $_[0];
-        # my $dhcpresp = $_[1];
-        # my $mac = $_[2];
         my ($self) = shift;
         my ($result);
         my $lease = 0;
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
-        my $requested_ip = ($self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
-        my $ip = $_[0]->ciaddr();
+        my $dhcpreqparams = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_PARAMETER_REQUEST_LIST());
+        my $requested_ip = ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
+        my $ip = $self->{dhcpreq}->ciaddr();
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(9, sprintf("ip = %s, requested_ip = %s", $ip, $requested_ip));
 
@@ -699,59 +676,59 @@ package Server; {
         # ciaddr = client_ip
         # request_ip = ''
         if ($ip ne '0.0.0.0') {
-            my $fixed_lease = $self->get_fixed_lease($ip, $_[2]);
-            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($ip, $_[2]);
+            my $fixed_lease = $self->get_fixed_lease($ip, $self->{mac});
+            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($ip, $self->{mac});
         }
         # request
         # ciaddr = 0.0.0.0
         # request_ip = client_ip
         elsif ($requested_ip ne '0.0.0.0') {
-            my $fixed_lease = $self->get_fixed_lease($requested_ip, $_[2]);
-            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($requested_ip, $_[2]);
+            my $fixed_lease = $self->get_fixed_lease($requested_ip, $self->{mac});
+            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($requested_ip, $self->{mac});
         }
 
         # lease exists
         if ($lease != 0) {
             $self->logger(0, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
-            $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+            $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
             $self->db_get_requested_data($result, $lease->{subnet_id}, '');
             if ($result != 0) {
-                $_[1]->yiaddr($lease->{ip});
-                $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-                $self->db_get_routing($dhcpreqparams, $lease->{subnet_id}, $_[1]);
-                $self->static_data_to_reply($dhcpreqparams, $_[1]);
+                $self->{dhcpresp}->yiaddr($lease->{ip});
+                $self->db_data_to_reply($result, $dhcpreqparams);
+                $self->db_get_routing($dhcpreqparams, $lease->{subnet_id});
+                $self->static_data_to_reply($dhcpreqparams);
                 return (1);
             }
         }
         # lease doesn't exists
         else {
-            $self->logger(0, sprintf("LEASE: Doesn't exists for %s %s", $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
-            $self->logger(3, sprintf("LEASE: Try to get free lease for %s %s", $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
-            $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+            $self->logger(0, sprintf("LEASE: Doesn't exists for %s %s", $self->{mac}, (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
+            $self->logger(3, sprintf("LEASE: Try to get free lease for %s %s", $self->{mac}, (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
+            $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
             # need subnet_id
-            $self->get_subnet_id(my $subnet, $_[0]->giaddr());
+            $self->get_subnet_id(my $subnet, $self->{dhcpreq}->giaddr());
             $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
-            if ($self->is_fixed($_[2], $subnet->{subnet_id})) {
+            if ($self->is_fixed($subnet->{subnet_id})) {
                 $self->db_get_requested_data($result, $subnet->{subnet_id});
                 $self->get_free_lease($lease, $subnet->{subnet_id});
                 if ($lease == 0 && $lease->{ip}) {
-                    $_[1]->yiaddr($lease->{ip});
-                    $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-                    $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-                    $self->static_data_to_reply($dhcpreqparams, $_[1]);
+                    $self->{dhcpresp}->yiaddr($lease->{ip});
+                    $self->db_data_to_reply($result, $dhcpreqparams);
+                    $self->db_get_routing($dhcpreqparams, $result->{subnet_id});
+                    $self->static_data_to_reply($dhcpreqparams);
                     return (1);
                 }
             }
             else {
-                $self->get_subnet_id($subnet, $_[0]->giaddr(), 'guest');
+                $self->get_subnet_id($subnet, $self->{dhcpreq}->giaddr(), 'guest');
                 $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
                 $self->db_get_requested_data($result, $subnet->{subnet_id});
                 $self->get_free_lease($lease, $subnet->{subnet_id});
                 if ($lease == 0 && $lease->{ip}) {
-                    $_[1]->yiaddr($lease->{ip});
-                    $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-                    $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-                    $self->static_data_to_reply($dhcpreqparams, $_[1]);
+                    $self->{dhcpresp}->yiaddr($lease->{ip});
+                    $self->db_data_to_reply($result, $dhcpreqparams);
+                    $self->db_get_routing($dhcpreqparams, $result->{subnet_id});
+                    $self->static_data_to_reply($dhcpreqparams);
                     return (1);
                 }
             }
@@ -791,7 +768,6 @@ package Server; {
         # my ($gw) = $_[1];
         # my ($type) = $_[2];
         my ($self) = shift;
-        my $sth;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("SUBNET: get subnet_id by gw = %s", $_[1])) if (defined($_[2]) == 0);
         $self->logger(2, sprintf("SUBNET: get subnet_id by gw = %s and type = %s", $_[1], $_[2])) if (defined($_[2]));
@@ -828,82 +804,42 @@ package Server; {
 
     }
 
-    sub db_get_requested_data_guest {
-        my ($self) = shift;
-        $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $dhcpreq = $_[0];
-        #my $dhcpresp = $_[1];
-        my ($mac, $sth, $dhcpreqparams, $result);
-        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        $dhcpreqparams = $self->get_req_param($_[0], DHO_DHCP_PARAMETER_REQUEST_LIST());
-
-        if ($_[0]->giaddr() eq '0.0.0.0') {
-            $self->logger(2, "Got a packet from guest client src = " . $_[0]->ciaddr());
-            $self->logger(2, sprintf("SQL: $self->{get_requested_data_guest}", $mac, $_[0]->ciaddr()));
-            $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_guest}, $mac, $_[0]->ciaddr()));
-        }
-        else {
-            $self->logger(2, "Got a packet from guest relay src = " . $_[0]->giaddr());
-            if ($self->GetRelayAgentOptions($_[1], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-                $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id)) {
-                $self->logger(2, sprintf("SQL: ($self->{get_requested_data_opt82}", $dhcp_opt82_vlan_id));
-                $sth = $self->{dbh}->prepare(sprintf($self->{get_requested_data_opt82}, $dhcp_opt82_vlan_id));
-            }
-        }
-
-        $sth->execute();
-
-        if ($sth->rows()) {
-            $result = $sth->fetchrow_hashref();
-            $_[1]->yiaddr($result->{ip});
-            $self->db_data_to_reply($result, $dhcpreqparams, $_[1]);
-            $self->db_get_routing($dhcpreqparams, $result->{subnet_id}, $_[1]);
-            $self->static_data_to_reply($dhcpreqparams, $_[1]);
-            $sth->finish();
-            return (1);
-        }
-
-        return (0);
-    }
-
     sub db_data_to_reply {
         # my ($self) = shift;
         # my $result = $_[0];
         # my $dhcpreqparams = $_[1];
-        # my $dhcpresp = $_[2];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         if (defined($_[0]->{dhcp_lease_time})) {
-            $_[2]->addOptionValue(DHO_DHCP_LEASE_TIME(), $_[0]->{dhcp_lease_time});
+            $self->{dhcpresp}->addOptionValue(DHO_DHCP_LEASE_TIME(), $_[0]->{dhcp_lease_time});
 
             # function (typically 50%) of the full configured duration (or lease time) for a client's lease
             if (defined($_[0]->{dhcp_renewal})) {
-                $_[2]->addOptionValue(DHO_DHCP_RENEWAL_TIME(), $_[0]->{dhcp_renewal});
+                $self->{dhcpresp}->addOptionValue(DHO_DHCP_RENEWAL_TIME(), $_[0]->{dhcp_renewal});
                 #} else {
-                #	$_[2]->addOptionValue(DHO_DHCP_RENEWAL_TIME(), ($_[0]->{dhcp_lease_time}/2));
+                #	$self->{dhcpresp}->addOptionValue(DHO_DHCP_RENEWAL_TIME(), ($_[0]->{dhcp_lease_time}/2));
             }
 
             # function (typically 87.5%) of the full configured duration (or lease time) for a client's lease
             if (defined($_[0]->{dhcp_rebind_time})) {
-                $_[2]->addOptionValue(DHO_DHCP_REBINDING_TIME(), $_[0]->{dhcp_rebind_time});
+                $self->{dhcpresp}->addOptionValue(DHO_DHCP_REBINDING_TIME(), $_[0]->{dhcp_rebind_time});
                 #} else {
-                #	$_[2]->addOptionValue(DHO_DHCP_REBINDING_TIME(), ($_[0]->{dhcp_lease_time}*7/8));
+                #	$self->{dhcpresp}->addOptionValue(DHO_DHCP_REBINDING_TIME(), ($_[0]->{dhcp_lease_time}*7/8));
             }
         }
 
         # do not add params if not requested
         return() if (defined($_[1]) == 0);
 
-        if (index($_[1], DHO_SUBNET_MASK()) != - 1 && defined($_[0]->{mask})) {$_[2]->addOptionValue(DHO_SUBNET_MASK(),
+        if (index($_[1], DHO_SUBNET_MASK()) != - 1 && defined($_[0]->{mask})) {$self->{dhcpresp}->addOptionValue(DHO_SUBNET_MASK(),
             $_[0]->{mask});}
-        if (index($_[1], DHO_ROUTERS()) != - 1 && defined($_[0]->{gateway})) {$_[2]->addOptionValue(DHO_ROUTERS(),
+        if (index($_[1], DHO_ROUTERS()) != - 1 && defined($_[0]->{gateway})) {$self->{dhcpresp}->addOptionValue(DHO_ROUTERS(),
             $_[0]->{gateway});}
-        if (index($_[1], DHO_DOMAIN_NAME_SERVERS()) != - 1 && defined($_[0]->{dns1})) {$_[2]->addOptionValue(
+        if (index($_[1], DHO_DOMAIN_NAME_SERVERS()) != - 1 && defined($_[0]->{dns1})) {$self->{dhcpresp}->addOptionValue(
             DHO_DOMAIN_NAME_SERVERS(), "$_[0]->{dns1} $_[0]->{dns2}");}
-        if (index($_[1], DHO_HOST_NAME()) != - 1 && defined($_[0]->{hostname})) {$_[2]->addOptionValue(DHO_HOST_NAME(),
+        if (index($_[1], DHO_HOST_NAME()) != - 1 && defined($_[0]->{hostname})) {$self->{dhcpresp}->addOptionValue(DHO_HOST_NAME(),
             $_[0]->{hostname});}
-        if (index($_[1], DHO_DOMAIN_NAME()) != - 1 && defined($_[0]->{domain})) {$_[2]->addOptionValue(
+        if (index($_[1], DHO_DOMAIN_NAME()) != - 1 && defined($_[0]->{domain})) {$self->{dhcpresp}->addOptionValue(
             DHO_DOMAIN_NAME(), $_[0]->{domain});}
     }
 
@@ -911,7 +847,6 @@ package Server; {
         # my ($self) = shift;
         # my $dhcpreqparams = $_[0];
         # my $subnet_id = $_[1];
-        # my $dhcpresp = $_[2];
         my ($self) = shift;
         my ($sth, $opt33Enbled, $optClasslessRoutesCode);
         $self->logger(9, "Function: " . (caller(0))[3]);
@@ -957,8 +892,8 @@ package Server; {
                     @$row[2]) if (defined($optClasslessRoutesCode));
             }
 
-            $_[2]->addOptionRaw(DHO_STATIC_ROUTES(), $opt33_data) if (defined($opt33_data));
-            $_[2]->addOptionRaw($optClasslessRoutesCode,
+            $self->{dhcpresp}->addOptionRaw(DHO_STATIC_ROUTES(), $opt33_data) if (defined($opt33_data));
+            $self->{dhcpresp}->addOptionRaw($optClasslessRoutesCode,
                 $opt_classless_routes_data) if (defined($opt_classless_routes_data));
         }
         $sth->finish();
@@ -967,25 +902,22 @@ package Server; {
     sub lease_offered {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
-        # my ($lease_time) = $_[2];
+        # my ($lease_time) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $_[1])) if ($self->add_lease($_[0], $_[1], $_[2]) == 1);
+        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $self->{mac})) if ($self->add_lease($_[0], $_[1]) == 1);
     } #done - done
 
     sub lease_nak {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->free_lease($_[0], $_[1]);
+        $self->free_lease($_[0]);
     } #done - done
 
     sub db_lease_decline {
         # my ($self) = shift;
-        # my $dhcpreq = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
 
@@ -994,7 +926,7 @@ package Server; {
         # request_ip = client_ip
         # ciaddr = 0
 
-        $self->logger(0, sprintf("Need to add functionality to this function, IP = %s already obtained by other client", $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS())));
+        $self->logger(0, sprintf("Need to add functionality to this function, IP = %s already obtained by other client", $self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS())));
         #my $sth = $self->{dbh}->prepare("");
         #$sth->execute();
         #$sth->finish();
@@ -1005,42 +937,38 @@ package Server; {
     sub lease_release {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->free_lease($_[0], $_[1]);
+        $self->free_lease($self->{dhcpreq}->ciaddr());
     } #done
 
     sub lease_ack {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
-        # my ($lease_time) = $_[2];
+        # my ($lease_time) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->update_lease_time($_[0], $_[1], $_[2]);
+        $self->update_lease_time($_[0], $_[1]);
     } #done - done
 
     sub db_log_detailed {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        #my $dhcpreq = $_[0];
         my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        my $mac = $self->FormatMAC(substr($_[0]->chaddr(), 0, (2 * $_[0]->hlen())));
-        my $client_ip = $_[0]->ciaddr();
-        my $gateway_ip = $_[0]->giaddr();
-        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($_[0], DHO_DHCP_CLIENT_IDENTIFIER()));
-        my $requested_ip = $self->get_req_param($_[0], DHO_DHCP_REQUESTED_ADDRESS());
-        my $hostname = $self->get_req_param($_[0], DHO_HOST_NAME());
-        my $dhcp_vendor_class = $self->get_req_param($_[0], DHO_VENDOR_CLASS_IDENTIFIER());
-        my $dhcp_user_class = $self->get_req_param($_[0], DHO_USER_CLASS());
-        my $type = $self->get_req_param($_[0], DHO_DHCP_MESSAGE_TYPE());
-        $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
+        my $client_ip = $self->{dhcpreq}->ciaddr();
+        my $gateway_ip = $self->{dhcpreq}->giaddr();
+        my $client_ident = $self->BuffToHEX($self->get_req_raw_param($self->{dhcpreq}, DHO_DHCP_CLIENT_IDENTIFIER()));
+        my $requested_ip = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS());
+        my $hostname = $self->get_req_param($self->{dhcpreq}, DHO_HOST_NAME());
+        my $dhcp_vendor_class = $self->get_req_param($self->{dhcpreq}, DHO_VENDOR_CLASS_IDENTIFIER());
+        my $dhcp_user_class = $self->get_req_param($self->{dhcpreq}, DHO_USER_CLASS());
+        my $type = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_MESSAGE_TYPE());
+        $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
             $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
-        $self->logger(3, sprintf("SQL: $self->{log_detailed}", $type, $mac, $client_ip, $gateway_ip,
+        $self->logger(3, sprintf("SQL: $self->{log_detailed}", $type, $self->{mac}, $client_ip, $gateway_ip,
             $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
             $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $mac, $client_ip, $gateway_ip,
+        my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $self->{mac}, $client_ip, $gateway_ip,
             $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
             $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
         $sth->execute();
@@ -1051,7 +979,7 @@ package Server; {
     # return value of param
     sub get_req_param {
         # my ($self) = shift;
-        # my $dhcpreq = $_[0];
+        # my $dhcppacket = $_[0];
         # my $param = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
@@ -1061,7 +989,7 @@ package Server; {
     # return raw value of param
     sub get_req_raw_param {
         # my ($self) = shift;
-        # my $dhcpreq = $_[0];
+        # my $dhcppacket = $_[0];
         # my $param = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
@@ -1074,17 +1002,16 @@ package Server; {
     sub add_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(3, sprintf("LEASE: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $result = $self->db_add_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]) == 0);
+        $self->logger(3, sprintf("LEASE: Try to add lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $result = $self->db_add_lease($_[0]) if ($self->check_lease($_[0]) == 0);
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Added lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0]), $_[0], $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not added lease for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not added lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         return ($result);
     } #done - done
@@ -1092,11 +1019,10 @@ package Server; {
     sub db_add_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
-        $self->logger(3, sprintf("SQL: Try to add lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_add}", $_[1], $_[0]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_add}, $_[1], $_[0]));
+        $self->logger(3, sprintf("SQL: Try to add lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_add}", $self->{mac}, $_[0]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_add}, $self->{mac}, $_[0]));
         my $result = $sth->execute();
         $sth->finish();
         return ($result);
@@ -1105,23 +1031,21 @@ package Server; {
     # fixed leases
     sub is_fixed {
         # my ($self) = shift;
-        # my ($mac) = $_[0];
-        # my ($subnet_id) = $_[1];
+        # my ($subnet_id) = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Check is static lease for MAC = %s in SUBNET = %s", $_[0], $_[1]));
-        return $self->db_is_fixed_lease($_[0], $_[1]);
+        $self->logger(2, sprintf("LEASE: Check is static lease for MAC = %s in SUBNET = %s", $self->{mac}, $_[0]));
+        return $self->db_is_fixed_lease($_[0]);
     }
 
     sub db_is_fixed_lease {
         # my ($self) = shift;
-        # my ($mac) = $_[0];
-        # my ($subnet_id) = $_[1];
+        # my ($subnet_id) = $_[0];
         my ($self) = shift;
         my ($lease) = 0;
-        $self->logger(3, sprintf("SQL: Check is fixed lease for MAC = %s in SUBNET = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{is_fixed}", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{is_fixed}, $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: Check is fixed lease for MAC = %s in SUBNET = %s", $self->{mac}, $_[0]));
+        $self->logger(3, sprintf("SQL: $self->{is_fixed}", $self->{mac}, $_[0]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{is_fixed}, $self->{mac}, $_[0]));
         $sth->execute();
         $lease = $sth->rows();
         $sth->finish();
@@ -1132,22 +1056,20 @@ package Server; {
     sub get_fixed_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to get static lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        return $self->db_get_fixed_lease($_[0], $_[1]) if ($self->check_fixed_lease($_[0], $_[1]));
+        $self->logger(2, sprintf("LEASE: Try to get static lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        return $self->db_get_fixed_lease($_[0]) if ($self->check_fixed_lease($_[0]));
     }
 
     sub db_get_fixed_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($lease) = undef;
-        $self->logger(3, sprintf("SQL: Try to get fixed lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get}", $_[0], $_[1], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get}, $_[0], $_[1], $_[1]));
+        $self->logger(3, sprintf("SQL: Try to get fixed lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get}", $_[0], $self->{mac}, $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get}, $_[0], $self->{mac}, $self->{mac}));
         $sth->execute();
         $lease = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
@@ -1158,17 +1080,16 @@ package Server; {
     sub check_fixed_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to find fixed lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->db_check_fixed_lease($_[0], $_[1], $result);
+        $self->logger(2, sprintf("LEASE: Try to find fixed lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->db_check_fixed_lease($_[0], $result);
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Found fixed for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Found fixed for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not found fixed for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not found fixed for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         return ($result);
     } #done - done
@@ -1176,14 +1097,13 @@ package Server; {
     sub db_check_fixed_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
-        # my ($result) = $_[2];
+        # my ($result) = $_[1];
         my ($self) = shift;
-        $self->logger(3, sprintf("SQL: Try to find fixed lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_fixed_check}", $_[0], $_[1], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_check}, $_[0], $_[1], $_[1]));
+        $self->logger(3, sprintf("SQL: Try to find fixed lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_fixed_check}", $_[0], $self->{mac}, $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_check}, $_[0], $self->{mac}, $self->{mac}));
         $sth->execute();
-        $_[2] = $sth->rows();
+        $_[1] = $sth->rows();
         $sth->finish();
     } #done - done
 
@@ -1191,22 +1111,20 @@ package Server; {
     sub get_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        return $self->db_get_lease($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
+        $self->logger(2, sprintf("LEASE: Try to get lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        return $self->db_get_lease($_[0]) if ($self->check_lease($_[0]));
     } #done - done
 
     sub db_get_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($lease) = undef;
-        $self->logger(3, sprintf("SQL: Try to get lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_get}", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_get}, $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: Try to get lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_get}", $_[0], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_get}, $_[0], $self->{mac}));
         $sth->execute();
         $lease = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
@@ -1241,17 +1159,16 @@ package Server; {
     sub check_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->db_check_lease($_[0], $_[1], $result);
+        $self->logger(2, sprintf("LEASE: Try to find lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->db_check_lease($_[0], $result);
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Found for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Found for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not found for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not found for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         return ($result);
     } #done - done
@@ -1259,14 +1176,13 @@ package Server; {
     sub db_check_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
-        # my ($result) = $_[2];
+        # my ($result) = $_[1];
         my ($self) = shift;
-        $self->logger(3, sprintf("SQL: Try to find lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_check}", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_check}, $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: Try to find lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_check}", $_[0], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_check}, $_[0], $self->{mac}));
         $sth->execute();
-        $_[2] = $sth->rows();
+        $_[1] = $sth->rows();
         $sth->finish();
     } #done - done
 
@@ -1274,18 +1190,17 @@ package Server; {
     sub free_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->db_free_lease($_[0], $_[1], $result) if ($self->check_lease($_[0], $_[1]));
+        $self->logger(2, sprintf("LEASE: Try to free lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->db_free_lease($_[0], $result) if ($self->check_lease($_[0]));
         $self->logger(0, sprintf("LEASE: %s", $result));
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Removed for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Removed for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not removed for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not removed for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         return ($result);
     } #done - done
@@ -1293,14 +1208,13 @@ package Server; {
     sub db_free_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
-        # my ($result) = $_[2];
+        # my ($result) = $_[1];
         my ($self) = shift;
-        $self->logger(3, sprintf("SQL: Try to free lease for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_free}", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free}, $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: Try to free lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_free}", $_[0], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free}, $_[0], $self->{mac}));
         $sth->execute();
-        $_[2] = $sth->rows();
+        $_[1] = $sth->rows();
         $sth->finish();
     } #done - done
 
@@ -1308,17 +1222,16 @@ package Server; {
     sub get_lease_time {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($time) = undef;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
-        $time = $self->db_get_lease_time($_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
+        $self->logger(2, sprintf("LEASE: Try to get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $time = $self->db_get_lease_time($_[0]) if ($self->check_lease($_[0]));
         if (defined($time) != 0) {
-            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $_[1], $time));
+            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $self->{mac}, $time));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Cann't get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Cann't get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
         }
         return ($time);
     } #done - done
@@ -1326,13 +1239,12 @@ package Server; {
     sub db_get_lease_time {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(3, sprintf("SQL: Try to get lease time for IP = %s and MAC = %s", $_[0], $_[1]));
-        $self->logger(3, sprintf("SQL: $self->{lease_time_get}", $_[0], $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_time_get}, $_[0], $_[1]));
+        $self->logger(3, sprintf("SQL: Try to get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_time_get}", $_[0], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_time_get}, $_[0], $self->{mac}));
         $sth->execute();
         $result = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
@@ -1343,18 +1255,17 @@ package Server; {
     sub update_lease_time {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($mac) = $_[1];
-        # my ($lease_time) = $_[2];
+        # my ($lease_time) = $_[1];
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $_[0], $_[1]));
-        $result = $self->db_update_lease_time($_[2], $_[0], $_[1]) if ($self->check_lease($_[0], $_[1]));
+        $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $result = $self->db_update_lease_time($_[1], $_[0]) if ($self->check_lease($_[0]));
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0]), $_[0], $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0], $_[1]), $_[0], $_[1]));
+            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($_[0]), $_[0], $self->{mac}));
         }
         return ($result);
     } #done - done
@@ -1363,12 +1274,11 @@ package Server; {
         # my ($self) = shift;
         # my ($lease_time) = $_[0];
         # my ($ip) = $_[1];
-        # my ($mac) = $_[2];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(3, sprintf("SQL: Try to update lease time for IP = %s and MAC = %s", $_[1], $_[2]));
-        $self->logger(3, sprintf("SQL: $self->{lease_update}", $_[0], $_[1], $_[2]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_update}, $_[0], $_[1], $_[2]));
+        $self->logger(3, sprintf("SQL: Try to update lease time for IP = %s and MAC = %s", $_[1], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_update}", $_[0], $_[1], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_update}, $_[0], $_[1], $self->{mac}));
         my $result = $sth->execute();
         $sth->finish();
         return ($result);
