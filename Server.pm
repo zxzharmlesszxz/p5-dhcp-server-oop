@@ -724,6 +724,10 @@ package Server; {
         else {
             $self->logger(0, sprintf("LEASE: Doesn't exists for %s %s", $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
             $self->logger(3, sprintf("LEASE: Try to get free lease for %s %s", $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
+            # need subnet_id
+            #if ($self->is_fixed($_[2], )) {
+
+            #}
             $self->db_get_requested_data($result, $_[2], (($ip ne '0.0.0.0') ? $ip : $requested_ip), $_[0]->giaddr());
             if ($lease == 0 && $result->{ip}) {
                 $_[1]->yiaddr($result->{ip});
@@ -1039,6 +1043,29 @@ package Server; {
     } #done - done
 
     # fixed leases
+    sub is_fixed {
+        # my ($self) = shift;
+        # my ($mac) = $_[0];
+        my ($self) = shift;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(2, sprintf("LEASE: Check is static lease for MAC = %s", $_[0]));
+        return $self->db_is_fixed_lease($_[0]);
+    }
+
+    sub db_is_fixed_lease {
+        # my ($self) = shift;
+        # my ($mac) = $_[0];
+        my ($self) = shift;
+        my ($lease) = 0;
+        $self->logger(3, sprintf("SQL: Check is fixed lease for MAC = %s", $_[0]));
+        $self->logger(3, sprintf("SQL: $self->{is_fixed}", $_[0]));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{is_fixed}, $_[0]));
+        $sth->execute();
+        $lease = $sth->rows();
+        $sth->finish();
+        return $lease;
+    } #done - done
+
     # get fixed lease (return array|undef)
     sub get_fixed_lease {
         # my ($self) = shift;
