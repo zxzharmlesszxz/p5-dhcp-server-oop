@@ -255,6 +255,7 @@ package Server; {
             $buf = undef;
 
             eval {
+                $self->reset();
                 # catch fatal errors
                 # receive packet
                 $self->{fromaddr} = recv($self->{SOCKET_RCV}, $buf, 16384, 0) || $self->logger(0, "recv err: $!");
@@ -298,15 +299,7 @@ package Server; {
                 elsif ($type == DHCPRELEASE) {$self->handle_release();}
                 elsif ($type == DHCPINFORM) {$self->handle_inform();}#-> DHCPACK
                 else {
-                    $self->{mac} = undef;
-                    $self->{dhcpreq} = undef;
-                    $self->{dhcpresp} = undef;
-                    $self->{fromaddr} = undef;
-                    $self->{dhcp_opt82_chasis_id} = undef;
-                    $self->{dhcp_opt82_unit_id} = undef;
-                    $self->{dhcp_opt82_port_id} = undef;
-                    $self->{dhcp_opt82_vlan_id} = undef;
-                    $self->{dhcp_opt82_subscriber_id} = undef;
+                    $self->reset();
                 }
 
                 if ($self->{DEBUG} > 0) {
@@ -322,6 +315,19 @@ package Server; {
 
         $self->thread_exit(0);
     } #done +-
+
+    sub reset {
+        my ($self) = shift;
+        $self->{mac} = undef;
+        $self->{dhcpreq} = undef;
+        $self->{dhcpresp} = undef;
+        $self->{fromaddr} = undef;
+        $self->{dhcp_opt82_chasis_id} = undef;
+        $self->{dhcp_opt82_unit_id} = undef;
+        $self->{dhcp_opt82_port_id} = undef;
+        $self->{dhcp_opt82_vlan_id} = undef;
+        $self->{dhcp_opt82_subscriber_id} = undef;
+    }
 
     sub thread_exit($) {
         # my ($self) = shift;
