@@ -705,6 +705,10 @@ package Server; {
             $self->logger(0, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
             $self->db_get_requested_data($result, $lease->{subnet_id});
             if ($result != 0) {
+                $self->get_fixed_lease2(my $s, $lease->{subnet_id});
+                if ($lease->{ip} ne $s->{ip}) {
+                    return (0);
+                }
                 $self->{dhcpresp}->yiaddr($lease->{ip});
                 $self->db_data_to_reply($result, $dhcpreqparams);
                 $self->db_get_routing($dhcpreqparams, $lease->{subnet_id});
