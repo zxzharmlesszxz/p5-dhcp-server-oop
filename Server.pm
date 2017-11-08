@@ -67,7 +67,12 @@ package Server; {
             get_requested_data_guest => '',
             get_requested_data_opt82 => '',
             log_detailed             => '',
-            dbh                      => undef
+            dbh                      => undef,
+            dhcp_opt82_vlan_id       => undef,
+            dhcp_opt82_unit_id       => undef,
+            dhcp_opt82_port_id       => undef,
+            dhcp_opt82_chasis_id     => undef,
+            dhcp_opt82_subscriber_id => undef
         };
 
         bless $self, $class;
@@ -279,10 +284,9 @@ package Server; {
                 # send duplicate of received packet to mirror
                 $self->send_mirror($buf);
                 # log all to db
-                my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
                 $self->{mac} = $self->FormatMAC(substr($self->{dhcpreq}->chaddr(), 0, (2 * $self->{dhcpreq}->hlen())));
                 $self->GenDHCPRespPkt();
-                $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+                $self->GetRelayAgentOptions();
                 $self->db_log_detailed();
 
                 # handle packet
@@ -292,7 +296,17 @@ package Server; {
                 elsif ($type == DHCPDECLINE) {$self->handle_decline();}
                 elsif ($type == DHCPRELEASE) {$self->handle_release();}
                 elsif ($type == DHCPINFORM) {$self->handle_inform();}#-> DHCPACK
-                else {}
+                else {
+                    $self->{mac} = undef;
+                    $self->{dhcpreq} = undef;
+                    $self->{dhcpresp} = undef;
+                    $self->{fromaddr} = undef;
+                    $self->{dhcp_opt82_chasis_id} = undef;
+                    $self->{dhcp_opt82_unit_id} = undef;
+                    $self->{dhcp_opt82_port_id} = undef;
+                    $self->{dhcp_opt82_vlan_id} = undef;
+                    $self->{dhcp_opt82_subscriber_id} = undef;
+                }
 
                 if ($self->{DEBUG} > 0) {
                     $t1 = Benchmark->new;
@@ -414,17 +428,10 @@ package Server; {
         return ($buf);
     } #done
 
-    sub GetRelayAgentOptions($$$$$$) {
+    sub GetRelayAgentOptions() {
         my ($self) = shift;
-        # my $dhcp_opt82_vlan_id = $_[0];
-        # my $dhcp_opt82_unit_id = $_[1];
-        # my $dhcp_opt82_port_id = $_[2];
-        # my $dhcp_opt82_chasis_id = $_[3];
-        # my $dhcp_opt82_subscriber_id = $_[4];
         my @RelayAgent;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        # Set return values.
-        $_[0] = $_[1] = $_[2] = $_[3] = $_[4] = '';
         # no options, return
         return(0) if (defined($self->{dhcpreq}->getOptionRaw(DHO_DHCP_AGENT_OPTIONS())) == 0);
 
@@ -438,32 +445,32 @@ package Server; {
                 next if (length($RelayAgent[($i + 1)]) < 4);
                 # first bytes must be: 00 04
                 # zte has 'eth 1/0/8:4096.444 0/0/0/0/0/0' (not packed string) /^(\w+)\s(\d+)\/(\d+)\/(\d+):(\d+)\.(\d+)\s(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/
-                #$_[0] = unpack('n', substr($RelayAgent[($i + 1)], -4, 2)); # may be 's'
+                #$self->{dhcp_opt82_vlan_id} = unpack('n', substr($RelayAgent[($i + 1)], -4, 2)); # may be 's'
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=\ )/;
-                $_[0] = $1;
-                $self->logger(1, "RelayAgent VLan: " . $_[0]);
-                #$_[1] = unpack('C', substr($RelayAgent[($i + 1)], -2, 1));
+                $self->{dhcp_opt82_vlan_id} = $1;
+                $self->logger(1, "RelayAgent VLan: " . $self->{dhcp_opt82_vlan_id});
+                #$self->{dhcp_opt82_unit_id} = unpack('C', substr($RelayAgent[($i + 1)], -2, 1));
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=\/\d+:)/;
-                $_[1] = $1;
-                $self->logger(1, "RelayAgent Unit: " . $_[1]);
-                #$_[2] = unpack('C', substr($RelayAgent[($i + 1)], -1, 1));
+                $self->{dhcp_opt82_unit_id} = $1;
+                $self->logger(1, "RelayAgent Unit: " . $self->{dhcp_opt82_unit_id});
+                #$self->{dhcp_opt82_port_id} = unpack('C', substr($RelayAgent[($i + 1)], -1, 1));
                 $RelayAgent[($i + 1)] =~ /(\d+)(?=:)/;
-                $_[2] = $1;
-                $self->logger(1, "RelayAgent Port: " . $_[2]);
+                $self->{dhcp_opt82_port_id} = $1;
+                $self->logger(1, "RelayAgent Port: " . $self->{dhcp_opt82_port_id});
             }
             elsif ($RelayAgent[$i] == 2) {
                 # Remote ID
                 next if (length($RelayAgent[($i + 1)]) < 6);
                 # first bytes must be: 00 06 or 01 06 or 02 xx
                 # first digit - format/data type, second - len
-                $_[3] = $self->FormatMAC(unpack("H*", substr($RelayAgent[($i + 1)], - 6, 6)));
-                $self->logger(1, "RelayAgent 4: " . $_[3]);
+                $self->{dhcp_opt82_chasis_id} = $self->FormatMAC(unpack("H*", substr($RelayAgent[($i + 1)], - 6, 6)));
+                $self->logger(1, "RelayAgent 4: " . $self->{dhcp_opt82_chasis_id});
                 # 02 xx - contain vlan num, undone
             }
             elsif ($RelayAgent[$i] == 6) {
                 # Subscriber ID
-                $_[4] = $RelayAgent[($i + 1)];
-                $self->logger(1, "RelayAgent 5: " . $_[4]);
+                $self->{dhcp_opt82_subscriber_id} = $RelayAgent[($i + 1)];
+                $self->logger(1, "RelayAgent 5: " . $self->{dhcp_opt82_subscriber_id});
             }
             else {}
         }
@@ -690,7 +697,6 @@ package Server; {
         # lease exists
         if ($lease != 0) {
             $self->logger(0, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
-            $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
             $self->db_get_requested_data($result, $lease->{subnet_id}, '');
             if ($result != 0) {
                 $self->{dhcpresp}->yiaddr($lease->{ip});
@@ -704,7 +710,6 @@ package Server; {
         else {
             $self->logger(0, sprintf("LEASE: Doesn't exists for %s %s", $self->{mac}, (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
             $self->logger(3, sprintf("LEASE: Try to get free lease for %s %s", $self->{mac}, (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
-            $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
             # need subnet_id
             $self->get_subnet_id(my $subnet, $self->{dhcpreq}->giaddr());
             $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
@@ -954,7 +959,6 @@ package Server; {
     sub db_log_detailed {
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my $client_ip = $self->{dhcpreq}->ciaddr();
         my $gateway_ip = $self->{dhcpreq}->giaddr();
         my $client_ident = $self->BuffToHEX($self->get_req_raw_param($self->{dhcpreq}, DHO_DHCP_CLIENT_IDENTIFIER()));
@@ -963,14 +967,12 @@ package Server; {
         my $dhcp_vendor_class = $self->get_req_param($self->{dhcpreq}, DHO_VENDOR_CLASS_IDENTIFIER());
         my $dhcp_user_class = $self->get_req_param($self->{dhcpreq}, DHO_USER_CLASS());
         my $type = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_MESSAGE_TYPE());
-        $self->GetRelayAgentOptions($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id,
-            $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         $self->logger(3, sprintf("SQL: $self->{log_detailed}", $type, $self->{mac}, $client_ip, $gateway_ip,
-            $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
-            $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
+            $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $self->{dhcp_opt82_chasis_id},
+            $self->{dhcp_opt82_unit_id}, $self->{dhcp_opt82_port_id}, $self->{dhcp_opt82_vlan_id}, $self->{dhcp_opt82_subscriber_id}));
         my $sth = $self->{dbh}->prepare(sprintf($self->{log_detailed}, $type, $self->{mac}, $client_ip, $gateway_ip,
-            $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $dhcp_opt82_chasis_id,
-            $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_vlan_id, $dhcp_opt82_subscriber_id));
+            $client_ident, $requested_ip, $hostname, $dhcp_vendor_class, $dhcp_user_class, $self->{dhcp_opt82_chasis_id},
+            $self->{dhcp_opt82_unit_id}, $self->{dhcp_opt82_port_id}, $self->{dhcp_opt82_vlan_id}, $self->{dhcp_opt82_subscriber_id}));
         $sth->execute();
         $sth->finish();
     } #done
