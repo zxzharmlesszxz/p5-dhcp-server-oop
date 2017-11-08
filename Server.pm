@@ -275,6 +275,8 @@ package Server; {
                 # send duplicate of received packet to mirror
                 $self->send_mirror($buf);
                 # log all to db
+                my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
+                $self->GetRelayAgentOptions($_[0], $dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
                 $self->db_log_detailed($dhcpreq);
 
                 # handle packet
@@ -791,7 +793,8 @@ package Server; {
         my ($self) = shift;
         my $sth;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("SUBNET: get subnet_id by gw = %s and type = %s", $_[1], $_[2]));
+        $self->logger(2, sprintf("SUBNET: get subnet_id by gw = %s", $_[1])) if (defined($_[2]) == 0);
+        $self->logger(2, sprintf("SUBNET: get subnet_id by gw = %s and type = %s", $_[1], $_[2])) if (defined($_[2]));
         $self->db_get_subnet_id($_[0], $_[1], $_[2]);
     }
 
@@ -803,7 +806,8 @@ package Server; {
         my ($self) = shift;
         my $sth;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("SQL: get subnet_id by gw = % and type = %s", $_[1], $_[2]));
+        $self->logger(2, sprintf("SQL: get subnet_id by gw = %s", $_[1])) if (defined($_[2]) == 0);
+        $self->logger(2, sprintf("SQL: get subnet_id by gw = %s and type = %s", $_[1], $_[2])) if (defined($_[2]));
 
         if ($_[2]) {
             $sth = $self->{dbh}->prepare(sprintf("SELECT `subnet_id` FROM `subnets` WHERE `gateway` = '%s' AND `type` = '%s' LIMIT 1;", $_[1], $_[2]));
