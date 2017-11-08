@@ -697,7 +697,7 @@ package Server; {
         # lease exists
         if ($lease != 0) {
             $self->logger(0, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
-            $self->db_get_requested_data($result, $lease->{subnet_id}, '');
+            $self->db_get_requested_data($result, $lease->{subnet_id});
             if ($result != 0) {
                 $self->{dhcpresp}->yiaddr($lease->{ip});
                 $self->db_data_to_reply($result, $dhcpreqparams);
