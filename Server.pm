@@ -716,7 +716,7 @@ package Server; {
             if ($self->is_fixed($subnet->{subnet_id})) {
                 $self->db_get_requested_data($result, $subnet->{subnet_id});
                 $self->get_fixed_lease2($lease, $subnet->{subnet_id});
-                if ($lease == 0 && $lease->{ip}) {
+                if ($lease->{ip}) {
                     $self->{dhcpresp}->yiaddr($lease->{ip});
                     $self->db_data_to_reply($result, $dhcpreqparams);
                     $self->db_get_routing($dhcpreqparams, $result->{subnet_id});
@@ -729,7 +729,7 @@ package Server; {
                 $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
                 $self->db_get_requested_data($result, $subnet->{subnet_id});
                 $self->get_free_lease($lease, $subnet->{subnet_id});
-                if ($lease == 0 && $lease->{ip}) {
+                if ($lease->{ip}) {
                     $self->{dhcpresp}->yiaddr($lease->{ip});
                     $self->db_data_to_reply($result, $dhcpreqparams);
                     $self->db_get_routing($dhcpreqparams, $result->{subnet_id});
