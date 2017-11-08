@@ -61,6 +61,7 @@ package Server; {
             is_fixed                 => '',
             lease_fixed_check        => '',
             lease_fixed_get          => '',
+            lease_fixed_get2         => '',
             get_routing              => '',
 
             get_requested_data       => '',
@@ -707,14 +708,14 @@ package Server; {
         }
         # lease doesn't exists
         else {
-            $self->logger(0, sprintf("LEASE: Doesn't exists for %s %s", $self->{mac}, (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
-            $self->logger(3, sprintf("LEASE: Try to get free lease for %s %s", $self->{mac}, (($ip ne '0.0.0.0') ? $ip : $requested_ip)));
+            $self->logger(0, sprintf("LEASE: Doesn't exists for %s", $self->{mac}));
+            $self->logger(3, sprintf("LEASE: Try to get free lease for %s", $self->{mac}));
             # need subnet_id
             $self->get_subnet_id(my $subnet, $self->{dhcpreq}->giaddr());
             $self->logger(3, sprintf("SUBNET: %s", $subnet->{subnet_id}));
             if ($self->is_fixed($subnet->{subnet_id})) {
                 $self->db_get_requested_data($result, $subnet->{subnet_id});
-                $self->get_fixed_lease($lease, $subnet->{subnet_id});
+                $self->get_fixed_lease2($lease, $subnet->{subnet_id});
                 if ($lease == 0 && $lease->{ip}) {
                     $self->{dhcpresp}->yiaddr($lease->{ip});
                     $self->db_data_to_reply($result, $dhcpreqparams);
@@ -1054,24 +1055,48 @@ package Server; {
     # get fixed lease (return array|undef)
     sub get_fixed_lease {
         # my ($self) = shift;
-        # my ($ip) = $_[0];
-        # my ($lease) = $_[1];
+        # my ($lease) = $_[0];
+        # my ($ip) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to get static lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
-        $_[1] = $self->db_get_fixed_lease($_[0]) if ($self->check_fixed_lease($_[0]));
+        $self->logger(2, sprintf("LEASE: Try to get static lease for MAC = %s and IP = %s", $self->{mac}, $_[1]));
+        $self->db_get_fixed_lease($_[0], $_[1]) if ($self->check_fixed_lease($_[1]));
     }
 
     sub db_get_fixed_lease {
         # my ($self) = shift;
-        # my ($ip) = $_[0];
-        # my ($lease) = $_[1];
+        # my ($lease) = $_[0];
+        # my ($ip) = $_[1];
         my ($self) = shift;
-        $self->logger(3, sprintf("SQL: Try to get fixed lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
-        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get}", $_[0], $self->{mac}, $self->{mac}));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get}, $_[0], $self->{mac}, $self->{mac}));
+        $self->logger(3, sprintf("SQL: Try to get fixed lease for MAC = %s and IP = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get}", $_[1], $self->{mac}, $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get}, $_[1], $self->{mac}, $self->{mac}));
         $sth->execute();
-        $_[1] = $sth->fetchrow_hashref() if ($sth->rows());
+        $_[0] = $sth->fetchrow_hashref() if ($sth->rows());
+        $sth->finish();
+    } #done - done
+
+    # get fixed lease (return array|undef)
+    sub get_fixed_lease2 {
+        # my ($self) = shift;
+        # my ($lease) = $_[0];
+        # my ($subnet_id) = $_[1];
+        my ($self) = shift;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->logger(2, sprintf("LEASE: Try to get static lease for MAC = %s in SUBNET = %s", $self->{mac}, $_[1]));
+        $self->db_get_fixed_lease2($_[0], $_[1]);# if ($self->check_fixed_lease($_[1]));
+    }
+
+    sub db_get_fixed_lease2 {
+        # my ($self) = shift;
+        # my ($lease) = $_[0];
+        # my ($subnet_id) = $_[1];
+        my ($self) = shift;
+        $self->logger(3, sprintf("SQL: Try to get fixed lease for MAC = %s in SUBNET = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: $self->{lease_fixed_get2}", $_[1], $self->{mac}, $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get2}, $_[1], $self->{mac}, $self->{mac}));
+        $sth->execute();
+        $_[0] = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
     } #done - done
 
