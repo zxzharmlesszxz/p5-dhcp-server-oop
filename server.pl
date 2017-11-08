@@ -6,19 +6,24 @@ use Server;
 
 my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID, $THREADS_COUNT, $DBDATASOURCE, $DBLOGIN, $DBPASS, $PIDFILE, $DEBUG, $DAEMON);
 
-my $get_requested_data = "SELECT * FROM `subnets`, `clients` WHERE `clients`.`mac` = '%s' AND `clients`.`subnet_id` = `subnets`.`subnet_id` AND (`clients`.`ip` = '%s' OR `subnets`.`gateway` = '%s') LIMIT 1;"; #done
+my $get_requested_data = "SELECT * FROM `subnets` WHERE `subnets`.`subnet_id` = %s LIMIT 1;"; #done
 my $get_requested_data_guest = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` = '%s' AND `ips`.`mac` NOT IN (SELECT `mac` FROM `clients`) LIMIT 1;";
 
 my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND (`ips`.`lease_time` IS NULL OR or `ips`.`lease_time` < UNIX_TIMESTAMP()) AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1 ;";
 
-my $get_routing   = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;"; #done - done
+my $get_routing          = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;"; #done - done
 
-my $lease_free     = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
-my $lease_add      = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';"; #done - done
-my $lease_update   = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
-my $lease_time_get = "SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
-my $lease_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;"; #done - done
-my $lease_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
+my $lease_free           = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
+my $lease_add            = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';"; #done - done
+my $lease_update         = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
+my $lease_time_get       = "SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
+my $lease_check          = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;"; #done - done
+my $lease_get            = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
+
+my $lease_fixed_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
+my $lease_fixed_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s' AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s');"; #done - done
+
+my $is_fixed             = "SELECT * FROM `clients` WHERE `mac` = '%s' AND `subnet_id` = %s LIMIT 1;"; #done - done
 
 my $log_detailed  = "INSERT INTO `dhcp_log` (`created`,`type`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');"; #done
 
@@ -61,6 +66,9 @@ $server->set('lease_update', $lease_update);
 $server->set('lease_time_get', $lease_time_get);
 $server->set('lease_check', $lease_check);
 $server->set('lease_get', $lease_get);
+$server->set('is_fixed', $is_fixed);
+$server->set('lease_fixed_check', $lease_fixed_check);
+$server->set('lease_fixed_get', $lease_fixed_get);
 $server->set('get_routing', $get_routing);
 
 $server->set('get_requested_data', $get_requested_data);
