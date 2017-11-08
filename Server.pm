@@ -672,7 +672,6 @@ package Server; {
         my ($self) = shift;
         my ($result);
         my $lease = 0;
-        my ($dhcp_opt82_vlan_id, $dhcp_opt82_unit_id, $dhcp_opt82_port_id, $dhcp_opt82_chasis_id, $dhcp_opt82_subscriber_id);
         my $dhcpreqparams = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_PARAMETER_REQUEST_LIST());
         my $requested_ip = ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) ne '') ? $self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) : '0.0.0.0' ;
         my $ip = $self->{dhcpreq}->ciaddr();
@@ -683,15 +682,15 @@ package Server; {
         # ciaddr = client_ip
         # request_ip = ''
         if ($ip ne '0.0.0.0') {
-            my $fixed_lease = $self->get_fixed_lease($ip, $self->{mac});
-            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($ip, $self->{mac});
+            $self->get_fixed_lease(my $fixed_lease, $ip);
+            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($ip);
         }
         # request
         # ciaddr = 0.0.0.0
         # request_ip = client_ip
         elsif ($requested_ip ne '0.0.0.0') {
-            my $fixed_lease = $self->get_fixed_lease($requested_ip, $self->{mac});
-            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($requested_ip, $self->{mac});
+            $self->get_fixed_lease(my $fixed_lease, $requested_ip);
+            $lease = $fixed_lease ? $fixed_lease : $self->get_lease($requested_ip);
         }
 
         # lease exists
@@ -907,10 +906,9 @@ package Server; {
     sub lease_offered {
         # my ($self) = shift;
         # my ($ip) = $_[0];
-        # my ($lease_time) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $self->{mac})) if ($self->add_lease($_[0], $_[1]) == 1);
+        $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $_[0], $self->{mac})) if ($self->add_lease($_[0]) == 1);
     } #done - done
 
     sub lease_nak {
@@ -1058,24 +1056,24 @@ package Server; {
     sub get_fixed_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
+        # my ($lease) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->logger(2, sprintf("LEASE: Try to get static lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
-        return $self->db_get_fixed_lease($_[0]) if ($self->check_fixed_lease($_[0]));
+        $_[1] = $self->db_get_fixed_lease($_[0]) if ($self->check_fixed_lease($_[0]));
     }
 
     sub db_get_fixed_lease {
         # my ($self) = shift;
         # my ($ip) = $_[0];
+        # my ($lease) = $_[1];
         my ($self) = shift;
-        my ($lease) = undef;
         $self->logger(3, sprintf("SQL: Try to get fixed lease for IP = %s and MAC = %s", $_[0], $self->{mac}));
         $self->logger(3, sprintf("SQL: $self->{lease_fixed_get}", $_[0], $self->{mac}, $self->{mac}));
         my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get}, $_[0], $self->{mac}, $self->{mac}));
         $sth->execute();
-        $lease = $sth->fetchrow_hashref() if ($sth->rows());
+        $_[1] = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();
-        return $lease;
     } #done - done
 
     #check fixed lease if exists (return 0,1)
