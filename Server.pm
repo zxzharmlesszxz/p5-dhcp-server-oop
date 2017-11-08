@@ -1068,7 +1068,7 @@ package Server; {
         # my ($lease) = $_[0];
         # my ($ip) = $_[1];
         my ($self) = shift;
-        $self->logger(3, sprintf("SQL: Try to get fixed lease for MAC = %s and IP = %s", $_[0], $self->{mac}));
+        $self->logger(3, sprintf("SQL: Try to get fixed lease for IP = %s and MAC = %s", $_[1], $self->{mac}));
         $self->logger(3, sprintf("SQL: $self->{lease_fixed_get}", $_[1], $self->{mac}, $self->{mac}));
         my $sth = $self->{dbh}->prepare(sprintf($self->{lease_fixed_get}, $_[1], $self->{mac}, $self->{mac}));
         $sth->execute();
