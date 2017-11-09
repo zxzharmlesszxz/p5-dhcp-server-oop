@@ -705,10 +705,12 @@ package Server; {
             $self->logger(0, sprintf("LEASE: Exists %s %s %s", $lease->{ip}, $lease->{mac}, $lease->{lease_time}));
             $self->db_get_requested_data($result, $lease->{subnet_id});
             if ($result != 0) {
-                $self->get_fixed_lease2(my $s, $lease->{subnet_id});
-                $self->logger(0, sprintf("LEASE: Exists 111 %s %s %s", $s->{ip}, $s->{mac}, $s->{lease_time}));
-                if ($lease->{ip} ne $s->{ip}) {
-                    return (0);
+                if ($self->is_fixed($subnet->{subnet_id})) {
+                    $self->get_fixed_lease2(my $s, $lease->{subnet_id});
+                    $self->logger(0, sprintf("LEASE: Exists 111 %s %s %s", $s->{ip}, $s->{mac}, $s->{lease_time}));
+                    if ($lease->{ip} ne $s->{ip}) {
+                        return (0);
+                    }
                 }
                 $self->{dhcpresp}->yiaddr($lease->{ip});
                 $self->db_data_to_reply($result, $dhcpreqparams);
