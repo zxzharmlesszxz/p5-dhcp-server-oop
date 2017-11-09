@@ -545,7 +545,7 @@ package Server; {
         my ($self) = shift;
         my ($identifier) = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_SERVER_IDENTIFIER());
         $self->logger(9, "Function: " . (caller(0))[3]);
-        return ($identifier ne '' && $identifier ne $self->{DHCP_SERVER_ID}) ? 0 : 1;
+        return ($identifier ne '' && $identifier ne $self->{DHCP_SERVER_ID}) ? 1 : undef;
     }
 
     # handlers functions
