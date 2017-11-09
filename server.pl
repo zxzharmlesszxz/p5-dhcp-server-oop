@@ -10,7 +10,9 @@ my ($DBDATASOURCE, $DBLOGIN, $DBPASS);
 
 my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND (`ips`.`lease_time` IS NULL OR or `ips`.`lease_time` < UNIX_TIMESTAMP()) AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1 ;";
 
-my $get_subnet           = "SELECT * FROM `subnets` WHERE `subnets`.`subnet_id` = %s LIMIT 1;"; #done
+my $get_subnet           = "SELECT * FROM `subnets` WHERE `subnet_id` = %s LIMIT 1;"; #done
+my $get_subnet_guest     = "SELECT `subnet_id` FROM `subnets` WHERE `gateway` = '%s' AND `type` = '%s' LIMIT 1;"; #done
+my $get_subnet_gw        = "SELECT `subnet_id` FROM `subnets` WHERE `gateway` = '%s' AND `type` != 'guest' LIMIT 1;"; #done
 my $get_routing          = "SELECT `destination`, `mask` `gateway` FROM `subnets_routes` WHERE `subnet_id` = '%s' LIMIT 30;"; #done - done
 my $lease_free           = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 my $lease_add            = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';"; #done - done
@@ -72,6 +74,8 @@ $server->set('lease_fixed_get2', $lease_fixed_get2);
 $server->set('get_routing', $get_routing);
 
 $server->set('get_subnet', $get_subnet);
+$server->set('get_subnet_gw', $get_subnet_gw);
+$server->set('get_subnet_guest', $get_subnet_guest);
 $server->set('get_requested_data_opt82', $get_requested_data_opt82);
 $server->set('log_detailed', $log_detailed);
 $server->start();
