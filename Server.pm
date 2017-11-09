@@ -1224,7 +1224,7 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
         $time = $self->db_get_lease_time($_[0]) if ($self->check_lease($_[0]));
         if (defined($time) != 0) {
-            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $self->{mac}, $time));
+            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $self->{mac}, scalar(localtime($time))));
         }
         else {
             $self->logger(0, sprintf("LEASE: Can't get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
