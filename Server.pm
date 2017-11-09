@@ -556,7 +556,7 @@ package Server; {
         # opt82        = true(always if enabled) or false
 
         $self->db_check_requested_data();
-        if ($self->get_subnet() == 1) {
+        if ($self->get_request_data() == 1) {
             $self->lease_offered();
         }
         else {
@@ -574,7 +574,7 @@ package Server; {
         $self->logger(9, "Function: " . (caller(0))[3]);
         $self->db_check_requested_data();
 
-        if ($self->get_subnet() == 1) {
+        if ($self->get_request_data() == 1) {
             if (($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) ne $self->{dhcpresp}->yiaddr() && $self->{dhcpreq}->ciaddr() eq '0.0.0.0') ||
                 ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $self->{dhcpreq}->ciaddr() ne $self->{dhcpresp}->yiaddr())) {
                 # NAK if requested addr not equal IP addr in DB
@@ -630,7 +630,7 @@ package Server; {
 
         # ciaddr = client_ip
         # request_ip = 0
-        if ($self->get_subnet() == 1) {
+        if ($self->get_request_data() == 1) {
             $dhcpreqparams = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_PARAMETER_REQUEST_LIST());
             $self->static_data_to_reply($dhcpreqparams);
         }
@@ -673,7 +673,7 @@ package Server; {
         }
     }
 
-    sub get_subnet {
+    sub get_request_data {
         # my ($self) = shift;
         my ($self) = shift;
         my ($result);
