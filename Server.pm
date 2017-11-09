@@ -554,7 +554,6 @@ package Server; {
         # my ($self) = shift;
         my $self = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
 
         # ciaddr       = 0
         # chaddr       = client_mac
@@ -562,9 +561,7 @@ package Server; {
         # opt82        = true(always if enabled) or false
 
         $self->db_check_requested_data();
-        if ($self->get_request_data() == 1) {
-            $self->lease_offered();
-        }
+        if ($self->get_request_data() == 1) {$self->lease_offered();}
         else {
             # if AUTO_CONFIGURE (116) supported - send disable generate link local addr
             if ($self->get_req_param($self->{dhcpreq}, DHO_AUTO_CONFIGURE()) ne '') {
@@ -585,23 +582,16 @@ package Server; {
                 ($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()) eq '' && $self->{dhcpreq}->ciaddr() ne $self->{dhcpresp}->yiaddr())) {
                 # NAK if requested addr not equal IP addr in DB
                 $self->logger(2, "Got REQUEST send NACK");
-                $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
                 $self->lease_nak($self->{dhcpreq}->ciaddr());
-                $self->{dhcpresp}->ciaddr('0.0.0.0');
-                $self->{dhcpresp}->yiaddr('0.0.0.0');
             }
             else {
                 $self->logger(2, "Got REQUEST send ACK");
-                $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
                 $self->lease_ack();
             }
 
             $self->send_reply();
         }
         else {
-            $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
-            $self->{dhcpresp}->ciaddr('0.0.0.0');
-            $self->{dhcpresp}->yiaddr('0.0.0.0');
             $self->lease_nak($self->get_req_param($self->{dhcpreq}, DHO_DHCP_REQUESTED_ADDRESS()));
             $self->send_reply();
         }
@@ -886,6 +876,7 @@ package Server; {
         # my ($self) = shift;
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPOFFER);
         $self->logger(0, sprintf("LEASE: Success OFFERED IP=%s for MAC=%s", $self->{dhcpresp}->yiaddr(), $self->{mac})) if ($self->add_lease($self->{dhcpresp}->yiaddr()) == 1);
     }
 
@@ -894,6 +885,9 @@ package Server; {
         # my ($ip) = $_[0];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPNAK);
+        $self->{dhcpresp}->ciaddr('0.0.0.0');
+        $self->{dhcpresp}->yiaddr('0.0.0.0');
         $self->free_lease($_[0]);
     }
 
@@ -927,6 +921,7 @@ package Server; {
         # my ($self) = shift;
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
+        $self->{dhcpresp}->{options}->{DHO_DHCP_MESSAGE_TYPE()} = pack('C', DHCPACK);
         $self->update_lease_time();
     }
 
