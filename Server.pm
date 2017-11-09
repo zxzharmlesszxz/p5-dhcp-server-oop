@@ -1255,10 +1255,10 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $self->{dhcpresp}->yiaddr(), $self->{mac}));
         $result = $self->db_update_lease_time($self->get_req_param($self->{dhcpresp}, DHO_DHCP_LEASE_TIME()), $self->{dhcpresp}->yiaddr()) if ($self->check_lease($self->{dhcpresp}->yiaddr()));
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($self->{dhcpresp}->yiaddr()), $self->{dhcpresp}->yiaddr(), $self->{mac}));
+            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", scalar(localtime($self->get_lease_time($self->{dhcpresp}->yiaddr()))), $self->{dhcpresp}->yiaddr(), $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($self->{dhcpresp}->yiaddr()), $self->{dhcpresp}->yiaddr(), $self->{mac}));
+            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", scalar(localtime($self->get_lease_time($self->{dhcpresp}->yiaddr()))), $self->{dhcpresp}->yiaddr(), $self->{mac}));
         }
         return ($result);
     }
