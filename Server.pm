@@ -1257,7 +1257,7 @@ package Server; {
         my ($self) = shift;
         my ($result) = 0;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
+        $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $self->{dhcpresp}->yiaddr(), $self->{mac}));
         $result = $self->db_update_lease_time($self->get_req_param($self->{dhcpresp}, DHO_DHCP_LEASE_TIME()), $self->{dhcpresp}->yiaddr()) if ($self->check_lease($self->{dhcpresp}->yiaddr()));
         if ($result == 1) {
             $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", $self->get_lease_time($self->{dhcpresp}->yiaddr()), $self->{dhcpresp}->yiaddr(), $self->{mac}));
