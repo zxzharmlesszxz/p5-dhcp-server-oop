@@ -543,8 +543,9 @@ package Server; {
     sub check_for_me {
         # my ($self) = shift;
         my ($self) = shift;
+        my ($identifier) = $self->get_req_param($self->{dhcpreq}, DHO_DHCP_SERVER_IDENTIFIER());
         $self->logger(9, "Function: " . (caller(0))[3]);
-        return ($self->get_req_raw_param($self->{dhcpreq}, DHO_DHCP_SERVER_IDENTIFIER()) eq $self->{DHCP_SERVER_ID}) ? 1 : 0;
+        return ($identifier ne '' && $identifier ne $self->{DHCP_SERVER_ID}) ? 0 : 1;
     }
 
     # handlers functions
