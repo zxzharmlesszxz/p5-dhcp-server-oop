@@ -548,6 +548,27 @@ package Server; {
         return ($identifier ne '' && $identifier ne $self->{DHCP_SERVER_ID}) ? 1 : undef;
     }
 
+    # params functions
+    # return value of param
+    sub get_req_param {
+        # my ($self) = shift;
+        # my $dhcppacket = $_[0];
+        # my $param = $_[1];
+        my ($self) = shift;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionValue($_[1]) : '';
+    }
+
+    # return raw value of param
+    sub get_req_raw_param {
+        # my ($self) = shift;
+        # my $dhcppacket = $_[0];
+        # my $param = $_[1];
+        my ($self) = shift;
+        $self->logger(9, "Function: " . (caller(0))[3]);
+        return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionRaw($_[1]) : '';
+    }
+
     # handlers functions
 
     sub handle_discover {
@@ -630,8 +651,10 @@ package Server; {
         $self->send_reply();
     }
 
+    # handlers
 
-    # Need to delete fromaddr from db-functions
+    # functions with their db functions
+
     sub db_check_requested_data {
         # my ($self) = shift;
         my ($self) = shift;
@@ -944,27 +967,6 @@ package Server; {
             $self->{dhcp_opt82_unit_id}, $self->{dhcp_opt82_port_id}, $self->{dhcp_opt82_vlan_id}, $self->{dhcp_opt82_subscriber_id}));
         $sth->execute();
         $sth->finish();
-    }
-
-    # params functions
-    # return value of param
-    sub get_req_param {
-        # my ($self) = shift;
-        # my $dhcppacket = $_[0];
-        # my $param = $_[1];
-        my ($self) = shift;
-        $self->logger(9, "Function: " . (caller(0))[3]);
-        return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionValue($_[1]) : '';
-    }
-
-    # return raw value of param
-    sub get_req_raw_param {
-        # my ($self) = shift;
-        # my $dhcppacket = $_[0];
-        # my $param = $_[1];
-        my ($self) = shift;
-        $self->logger(9, "Function: " . (caller(0))[3]);
-        return defined($_[0]->getOptionRaw($_[1])) ? $_[0]->getOptionRaw($_[1]) : '';
     }
 
     # lease functions

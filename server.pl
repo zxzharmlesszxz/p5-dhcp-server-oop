@@ -17,7 +17,7 @@ my $get_routing          = "SELECT `destination`, `mask` `gateway` FROM `subnets
 my $lease_free           = "UPDATE `ips` SET `lease_time` = NULL, `mac` = NULL WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
 my $lease_add            = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+30, `mac` = '%s' WHERE `ip` = '%s';"; #done - done
 my $lease_update         = "UPDATE `ips` SET `lease_time` = UNIX_TIMESTAMP()+%d WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
-my $lease_time_get       = "SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s';"; #done - done
+my $lease_time_get       = "SELECT `lease_time` FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s'; LIMIT 1"; #done - done
 my $lease_check          = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` LIMIT 1;"; #done - done
 my $lease_get            = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s' LIMIT 1;"; #done - done
 my $lease_fixed_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
