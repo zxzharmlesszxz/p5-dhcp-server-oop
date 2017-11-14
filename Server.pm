@@ -1226,7 +1226,7 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
         $time = $self->db_get_lease_time($_[0]) if ($self->check_lease($_[0]));
         if (defined($time) != 0) {
-            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $self->{mac}, scalar(localtime($time))));
+            $self->logger(0, sprintf("LEASE: Lease time for IP = %s and MAC = %s is %s ", $_[0], $self->{mac}, (strftime "[%d/%b/%Y %H:%M:%S] ", localtime($time))));
         }
         else {
             $self->logger(0, sprintf("LEASE: Can't get lease time for IP = %s and MAC = %s", $_[0], $self->{mac}));
@@ -1257,10 +1257,10 @@ package Server; {
         $self->logger(2, sprintf("LEASE: Try to update lease time for IP = %s and MAC = %s", $self->{dhcpresp}->yiaddr(), $self->{mac}));
         $result = $self->db_update_lease_time($self->get_req_param($self->{dhcpresp}, DHO_DHCP_LEASE_TIME()), $self->{dhcpresp}->yiaddr()) if ($self->check_lease($self->{dhcpresp}->yiaddr()));
         if ($result == 1) {
-            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", scalar(localtime($self->get_lease_time($self->{dhcpresp}->yiaddr()))), $self->{dhcpresp}->yiaddr(), $self->{mac}));
+            $self->logger(0, sprintf("LEASE: Updated lease time %s for IP = %s and MAC = %s", (strftime "[%d/%b/%Y %H:%M:%S] ", localtime($self->get_lease_time($self->{dhcpresp}->yiaddr()))), $self->{dhcpresp}->yiaddr(), $self->{mac}));
         }
         else {
-            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", scalar(localtime($self->get_lease_time($self->{dhcpresp}->yiaddr()))), $self->{dhcpresp}->yiaddr(), $self->{mac}));
+            $self->logger(0, sprintf("LEASE: Not updated lease time %s for IP = %s and MAC = %s", (strftime "[%d/%b/%Y %H:%M:%S] ", localtime($self->get_lease_time($self->{dhcpresp}->yiaddr()))), $self->{dhcpresp}->yiaddr(), $self->{mac}));
         }
         return ($result);
     }
