@@ -2,6 +2,7 @@
 use strict;
 use warnings FATAL => 'all';
 use Getopt::Long;
+use utf8;
 use Server;
 
 my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID);
