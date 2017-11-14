@@ -8,7 +8,7 @@ my ($BIND_ADDR, $SERVER_PORT, $CLIENT_PORT, $MIRROR, $DHCP_SERVER_ID);
 my ($THREADS_COUNT, $PIDFILE, $DEBUG, $DAEMON);
 my ($DBDATASOURCE, $DBLOGIN, $DBPASS);
 
-my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND (`ips`.`lease_time` IS NULL OR or `ips`.`lease_time` < UNIX_TIMESTAMP()) AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1 ;";
+my $get_requested_data_opt82 = "SELECT * FROM `subnets`, `ips` WHERE `subnets`.`vlan_id` = '%s' AND `subnets`.`subnet_id` = `ips`.`subnet_id` AND `subnets`.`type` = 'guest' AND (`ips`.`lease_time` IS NULL OR or `ips`.`lease_time` < UNIX_TIMESTAMP()) AND `ips`.`ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1;";
 
 my $get_subnet           = "SELECT * FROM `subnets` WHERE `subnet_id` = %s LIMIT 1;"; #done
 my $get_subnet_guest     = "SELECT `subnet_id` FROM `subnets` WHERE `gateway` = '%s' AND `type` = '%s' LIMIT 1;"; #done
