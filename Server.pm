@@ -1146,8 +1146,8 @@ package Server; {
         # my ($subnet_id) = $_[1];
         my ($self) = shift;
         $self->logger(9, "Function: " . (caller(0))[3]);
-        $self->logger(3, sprintf("SQL: $self->{lease_free_get}", $_[1]));
-        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free_get}, $_[1]));
+        $self->logger(3, sprintf("SQL: $self->{lease_free_get}", $_[1], $self->{mac}));
+        my $sth = $self->{dbh}->prepare(sprintf($self->{lease_free_get}, $_[1], $self->{mac}));
         $sth->execute();
         $_[0] = $sth->fetchrow_hashref() if ($sth->rows());
         $sth->finish();

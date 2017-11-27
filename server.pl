@@ -24,7 +24,7 @@ my $lease_get            = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%
 my $lease_fixed_check    = "SELECT * FROM `subnets`, `ips` WHERE `ips`.`ip` = '%s' AND `ips`.`mac` = '%s' AND `ips`.`subnet_id` = `subnets`.`subnet_id` AND `ips`.`ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
 my $lease_fixed_get      = "SELECT * FROM `ips` WHERE `ip` = '%s' AND `mac` = '%s' AND `ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
 my $lease_fixed_get2     = "SELECT * FROM `ips` WHERE `subnet_id` = '%s' AND `ip` IN (SELECT `ip` FROM `clients` WHERE `mac` = '%s') LIMIT 1;"; #done - done
-my $lease_free_get       = "SELECT * FROM `ips` WHERE `subnet_id` = '%s' AND `mac` IS NULL AND `ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1;";
+my $lease_free_get       = "SELECT * FROM `ips` WHERE `subnet_id` = '%s' AND (`mac` = '%s' OR `mac` IS NULL) AND `ip` NOT IN (SELECT `ip` FROM `clients`) LIMIT 1;";
 my $is_fixed             = "SELECT * FROM `clients` WHERE `mac` = '%s' AND `subnet_id` = '%s' LIMIT 1;"; #done - done
 my $log_detailed         = "INSERT INTO `dhcp_log` (`created`,`type`,`client_mac`,`client_ip`,`gateway_ip`,`client_ident`,`requested_ip`,`hostname`, `dhcp_vendor_class`,`dhcp_user_class`,`dhcp_opt82_chasis_id`,`dhcp_opt82_unit_id`, `dhcp_opt82_port_id`, `dhcp_opt82_vlan_id`, `dhcp_opt82_subscriber_id`) VALUES (NOW(), '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %s, %s, %s, %s, %s);"; #done
 
