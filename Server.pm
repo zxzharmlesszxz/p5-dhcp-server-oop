@@ -38,7 +38,7 @@ package Server; {
             BIND_ADDR                => '0.0.0.0',
             SERVER_PORT              => '67',
             CLIENT_PORT              => '68',
-            DHCP_SERVER_ID           => '',
+            DHCP_SERVER_ID           => undef,
             MIRROR                   => undef,
             DBDATASOURCE             => 'mysql:dhcp:127.0.0.1',
             DBLOGIN                  => 'dhcp',
